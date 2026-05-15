@@ -10,6 +10,7 @@ import { ExampleScene } from './scenes/ExampleScene.js';
 import { CrystalCavernScene } from './scenes/crystalCavernScene.js';
 import { RetroConsoleScene } from './scenes/retroConsoleScene.js';
 import { CombatZoneScene } from './scenes/CombatZoneScene.js';
+import { ScanChamberScene } from './scan/ScanChamberScene.js';
 import { CombatHUD } from './combat/CombatHUD.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 import { modelManager } from './core/ModelManager.js';
@@ -132,6 +133,10 @@ const combatHud = new CombatHUD(container);
 combatZoneScene.setCombatHud(combatHud);
 sceneManager.registerScene('combat_zone', combatZoneScene);
 
+const scanChamberScene = new ScanChamberScene();
+scanChamberScene.mountScanUI(container);
+sceneManager.registerScene('scan_chamber', scanChamberScene);
+
 const anchorManager = new AnchorManager({ sceneManager });
 
 const _lookTarget = new THREE.Vector3(0, 0, 0);
@@ -176,12 +181,19 @@ async function switchScene(id, options) {
   interactionSystem.rebuildTargets();
   syncCameraToScene();
   const isCombat = id === 'combat_zone';
+  const isScan = id === 'scan_chamber';
   interactionSystem.setEnabled(!isCombat);
   setTraversalInputActive(true);
   if (isCombat) {
     combatHud.show();
   } else {
     combatHud.hide();
+  }
+  if (isScan) {
+    scanChamberScene.mountScanUI(container);
+    scanChamberScene.scanUI?.show();
+  } else {
+    scanChamberScene.scanUI?.hide();
   }
   if (sceneManager.currentScene?.player) {
     webglRenderer.domElement.requestPointerLock?.();
@@ -216,6 +228,9 @@ inputSystem.on('keyDown', ({ code }) => {
   }
   if (code === 'Digit6') {
     switchScene('combat_zone', { transition: 'warp', duration: 0.85 });
+  }
+  if (code === 'Digit7') {
+    switchScene('scan_chamber', { transition: 'warp', duration: 0.85 });
   }
   if (code === 'KeyO' && !sceneManager.currentScene?.player) {
     cameraController.toggleMode();

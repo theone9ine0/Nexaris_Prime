@@ -4,6 +4,8 @@ import { modelManager } from '../core/ModelManager.js';
 import { AvatarController } from '../avatars/AvatarController.js';
 import { NPCManager } from '../npc/NPCManager.js';
 import { SAMPLE_ROBOT_GLB, SAMPLE_VRM_URL } from '../assets/modelUrls.js';
+import { scanSession } from '../scan/AvatarScanManager.js';
+import { AvatarScanManager } from '../scan/AvatarScanManager.js';
 import { PortalManager } from '../portals/PortalManager.js';
 
 const EXPRESSION_CYCLE = ['happy', 'angry', 'sad', 'surprised'];
@@ -198,7 +200,8 @@ export class ExampleScene extends SceneBase {
    */
   async _trySpawnVRMAvatar() {
     try {
-      const { vrm, object, animations } = await modelManager.cloneVRM(SAMPLE_VRM_URL);
+      const vrmUrl = scanSession.lastScanUrl ?? SAMPLE_VRM_URL;
+      const { vrm, object, animations } = await modelManager.cloneVRM(vrmUrl);
       object.name = 'player_vrm';
       object.position.set(0, 0, 0);
       object.scale.setScalar(1);
@@ -223,7 +226,21 @@ export class ExampleScene extends SceneBase {
         groundY: 0,
         walkSpeed: 2.2,
         runSpeed: 4.5,
+        scanSource: scanSession.lastScanUrl,
       });
+
+      if (scanSession.lastScanUrl) {
+        const scanMgr = new AvatarScanManager();
+        scanMgr.scanUrl = scanSession.lastScanUrl;
+        scanMgr.scanId = scanSession.lastScanId;
+        scanMgr.stitchedCanvas = scanSession.lastStitchedCanvas;
+        scanMgr.customizationConfig = {
+          ...scanMgr.customizationConfig,
+          ...scanSession.lastCustomization,
+        };
+        scanMgr.applyScanToVRM(vrm, avatar.vrmAvatar);
+        await scanMgr.applyCustomizationToAvatar(avatar);
+      }
 
       avatar.vrmAvatar?.setLookAtTarget(this.cameraController.camera);
       avatar.vrmAvatar?.setBlink(true);

@@ -221,6 +221,33 @@ export class VRMAvatar {
     this.setExpression('relaxed', 0);
   }
 
+  /**
+   * PR43 — baseline expression weights for scanned avatars.
+   * @param {{ neutral?: number, happy?: number, relaxed?: number, surprised?: number }} profile
+   */
+  setScanExpressionProfile(profile) {
+    this._scanExpressionProfile = { ...profile };
+    for (const [name, weight] of Object.entries(profile)) {
+      if (weight != null) {
+        this.setExpression(name, weight);
+      }
+    }
+  }
+
+  /**
+   * Stylized scan presentation (non-realistic highlights).
+   * @param {{ eyeGlow?: number, hairLift?: number }} [options]
+   */
+  applyScanPresentation(options = {}) {
+    if (options.eyeGlow != null) {
+      this.setExpression('surprised', options.eyeGlow * 0.35);
+    }
+    if (options.hairLift != null) {
+      this.setExpression('happy', options.hairLift * 0.2);
+    }
+    this.object.userData.scanPresentation = true;
+  }
+
   dispose() {
     this.clearTransformationBoost();
     this.clearTransformationExpressions();

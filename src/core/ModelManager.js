@@ -276,6 +276,61 @@ export class ModelManager {
   }
 
   /**
+   * @param {string} scanId
+   * @returns {string}
+   */
+  static getScanUrl(scanId) {
+    return `scan://${scanId}`;
+  }
+
+  /**
+   * @param {string} url
+   * @returns {boolean}
+   */
+  static isScanUrl(url) {
+    return typeof url === 'string' && url.startsWith('scan://');
+  }
+
+  /**
+   * @param {string} url
+   * @returns {string | null}
+   */
+  static scanIdFromUrl(url) {
+    if (!ModelManager.isScanUrl(url)) return null;
+    return url.replace('scan://', '');
+  }
+
+  /**
+   * @param {string} scanId
+   * @returns {string}
+   */
+  getScanUrl(scanId) {
+    return ModelManager.getScanUrl(scanId);
+  }
+
+  /**
+   * Fetch VRM binary (public for scan pipeline).
+   * @param {string} url
+   * @returns {Promise<ArrayBuffer>}
+   */
+  async fetchVRMBuffer(url) {
+    return this._fetchVRMBuffer(url);
+  }
+
+  /**
+   * Register a scanned VRM buffer under scan:// id (PR43).
+   * @param {string} scanId
+   * @param {ArrayBuffer} buffer
+   */
+  async registerScanVRM(scanId, buffer) {
+    const url = ModelManager.getScanUrl(scanId);
+    this._vrmBuffers.set(url, buffer);
+    const entry = await this._parseVRMBuffer(url, buffer, true);
+    this._vrmCache.set(url, entry);
+    return entry;
+  }
+
+  /**
    * @param {string} url
    * @returns {Promise<ArrayBuffer>}
    */

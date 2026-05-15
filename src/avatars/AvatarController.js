@@ -41,6 +41,7 @@ const _UP = new THREE.Vector3(0, 1, 0);
  *   groundY?: number,
  *   gravity?: number,
  *   jumpForce?: number,
+ *   scanSource?: string | null,
  * }} AvatarControllerOptions
  */
 
@@ -86,7 +87,12 @@ export class AvatarController {
     this.jumpForce = options.jumpForce ?? 5.5;
 
     this.id = options.object.name || 'avatar';
-    this.metadata = { title: 'Avatar', type: 'avatar', payload: null };
+    this.scanSource = options.scanSource ?? null;
+    this.metadata = {
+      title: options.scanSource ? 'Scanned Avatar' : 'Avatar',
+      type: 'avatar',
+      payload: options.scanSource ? { scanUrl: options.scanSource, stylized: true } : null,
+    };
 
     this._horizontalVelocity = new THREE.Vector3();
     this._verticalVelocity = 0;
