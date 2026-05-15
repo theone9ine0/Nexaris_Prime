@@ -44,6 +44,8 @@ export class ScanChamberScene extends SceneBase {
     this._scanning = false;
     this._inspectMode = false;
     this._inspectAngle = 0;
+    this._faceTransition = 0;
+    this._faceStylizing = false;
   }
 
   _buildContent() {
@@ -135,6 +137,7 @@ export class ScanChamberScene extends SceneBase {
         this._ambience.uiBeep();
       },
       onEnterWorld: () => this._exitToWorld(),
+      onStylizeFace: () => this._runFaceStylize(),
     });
 
     this.scanManager.onProgress = (p, msg) => {
@@ -241,7 +244,6 @@ export class ScanChamberScene extends SceneBase {
 
     object.position.set(0, 0, 0);
     this.scene.add(object);
-    this.scanManager.applyScanToVRM(vrm);
 
     const avatar = new AvatarController({
       object,
@@ -263,6 +265,7 @@ export class ScanChamberScene extends SceneBase {
       payload: { scanId: this.scanManager.scanId, stylized: true },
     };
 
+    this.scanManager.applyScanToVRM(vrm, avatar.vrmAvatar);
     await this.scanManager.applyCustomizationToAvatar(avatar);
 
     this._previewPod = object;
@@ -277,6 +280,44 @@ export class ScanChamberScene extends SceneBase {
     });
 
     this.interactionSystem?.rebuildTargets();
+    this.scanUI?.setStylizeEnabled(true);
+  }
+
+  async _runFaceStylize() {
+    if (!this.scanManager?.hasFrontPhoto() || this._faceStylizing) return;
+
+    this._faceStylizing = true;
+    this._faceTransition = 0;
+
+    try {
+      if (!this.player?.vrmAvatar?.vrm) {
+        this.scanUI?.setStatus('Generate avatar body first, then stylize face.');
+        return;
+      }
+
+      this.scanUI?.setProgress(0.05, 'Stylizing anime face…');
+      this._scanRig?.update(0, { scanning: true, intensity: 0.85 });
+      this._ambience.pulseScan(0.5);
+
+      const vrm = this.player.vrmAvatar.vrm;
+      const result = await this.scanManager.stylizeFace(vrm, this.player.vrmAvatar);
+
+      if (result?.canvas) {
+        this.scanUI?.setFacePreview(result.canvas.toDataURL('image/png'));
+      }
+
+      this._faceTransition = 1;
+      this.player.vrmAvatar?.previewFaceExpression('happy', 0.6);
+      this.scanUI?.setStatus('Stylized face applied! Fictional anime look — not a realistic copy.');
+      this._ambience.completeChime();
+    } catch (err) {
+      console.warn('[ScanChamberScene] Face stylize failed:', err);
+      this.scanUI?.setStatus(`Face stylize failed: ${err.message}`);
+      this.scanUI?.hideProgress();
+    } finally {
+      this._faceStylizing = false;
+      this._scanRig?.update(0, { scanning: false, intensity: 0 });
+    }
   }
 
   async _exitToWorld() {
@@ -285,6 +326,8 @@ export class ScanChamberScene extends SceneBase {
     scanSession.lastScanUrl = this.scanManager?.scanUrl ?? scanSession.lastScanUrl;
     scanSession.lastScanId = this.scanManager?.scanId ?? scanSession.lastScanId;
     scanSession.lastStitchedCanvas = this.scanManager?.stitchedCanvas ?? null;
+    scanSession.lastFaceStylization = this.scanManager?.faceStylizationResult?.params ?? scanSession.lastFaceStylization;
+    scanSession.lastFaceTextureCanvas = this.scanManager?.faceStylizationResult?.canvas ?? scanSession.lastFaceTextureCanvas;
 
     const target = this.sceneManagerRef.resolveSceneId?.(MAIN_WORLD_SCENE_ID) ?? 'example';
 
@@ -336,9 +379,15 @@ export class ScanChamberScene extends SceneBase {
       this._holoPanels.rotation.y = Math.sin(this._elapsed * 0.2) * 0.05;
     }
 
+    if (this._faceTransition > 0 && this._faceTransition < 1) {
+      this._faceTransition = Math.min(1, this._faceTransition + deltaTime * 0.5);
+    }
+
     if (this._inspectMode && this._previewPod) {
       this._inspectAngle += deltaTime * 0.35;
+      const faceEase = this._faceTransition > 0 ? THREE.MathUtils.smoothstep(this._faceTransition, 0, 1) : 1;
       this._previewPod.rotation.y = this._inspectAngle;
+      this._previewPod.scale.setScalar(0.92 + faceEase * 0.08);
 
       const orbitR = 5.5;
       const camY = 2.2 + Math.sin(this._elapsed * 0.4) * 0.15;

@@ -5,6 +5,8 @@ import { REQUIRED_PHOTO_SLOTS } from './types.js';
 import { MockReconstructionPipeline } from './mock/MockReconstructionPipeline.js';
 import { MockTextureStitcher } from './mock/MockTextureStitcher.js';
 import { VRMRiggingHelper } from './mock/VRMRiggingHelper.js';
+import { FaceStylizer } from '../stylizer/FaceStylizer.js';
+import { FaceTextureGenerator } from '../stylizer/FaceTextureGenerator.js';
 
 /**
  * @typedef {import('./types.js').PhotoSet} PhotoSet
@@ -26,6 +28,10 @@ export const scanSession = {
   lastCustomization: null,
   /** @type {HTMLCanvasElement | null} */
   lastStitchedCanvas: null,
+  /** @type {import('../stylizer/types.js').StylizedFaceParams | null} */
+  lastFaceStylization: null,
+  /** @type {HTMLCanvasElement | null} */
+  lastFaceTextureCanvas: null,
 };
 
 /**
@@ -44,6 +50,7 @@ export class AvatarScanManager {
 
     this._reconstruction = new MockReconstructionPipeline();
     this._stitcher = new MockTextureStitcher();
+    this.faceStylizer = new FaceStylizer();
 
     /** @type {PhotoSet} */
     this.photoSet = {};
@@ -76,6 +83,70 @@ export class AvatarScanManager {
 
     /** @type {((progress: number, message: string) => void) | null} */
     this.onProgress = null;
+
+    /** @type {import('../stylizer/types.js').StylizedFaceResult | null} */
+    this.faceStylizationResult = null;
+    this.faceStylized = false;
+  }
+
+  /**
+   * @returns {boolean}
+   */
+  hasFrontPhoto() {
+    return !!this.photoSet.front;
+  }
+
+  /**
+   * PR45 — stylize face from front photo (anime, non-realistic).
+   * @param {import('@pixiv/three-vrm').VRM} vrm
+   * @param {import('../vrm/VRMAvatar.js').VRMAvatar | null} [vrmAvatar]
+   */
+  async stylizeFace(vrm, vrmAvatar = null) {
+    const front = this.photoSet.front;
+    if (!front) {
+      throw new Error('Front face photo required for stylization');
+    }
+
+    this._setProgress(0.1, 'Extracting stylized features…');
+    await this.faceStylizer.stylizeFromPhoto(front, vrm, vrmAvatar);
+    this.faceStylizationResult = this.faceStylizer.result;
+    this.faceStylized = true;
+
+    const params = this.faceStylizationResult.params;
+    this.applyCustomization({
+      colors: {
+        head: params.skinGradient.base,
+        hair: params.hairColor,
+        body: this.customizationConfig.colors?.body ?? 0xaaccff,
+      },
+      materials: {
+        head: { emissiveIntensity: 0.12, roughness: 0.78 },
+        hair: { roughness: 0.65 },
+      },
+    });
+
+    scanSession.lastFaceStylization = params;
+    scanSession.lastFaceTextureCanvas = this.faceStylizationResult.canvas;
+
+    this._setProgress(1, 'Stylized face applied!');
+    return this.faceStylizationResult;
+  }
+
+  /**
+   * Re-apply saved face stylization from scanSession (cross-scene).
+   * @param {VRM} vrm
+   * @param {import('../vrm/VRMAvatar.js').VRMAvatar | null} [vrmAvatar]
+   */
+  async restoreFaceStylization(vrm, vrmAvatar = null) {
+    const params = scanSession.lastFaceStylization;
+    const canvas = scanSession.lastFaceTextureCanvas;
+    if (!params || !canvas) return null;
+
+    const { texture } = FaceTextureGenerator.generate(params);
+    this.faceStylizationResult = { mesh: null, texture, canvas, params };
+    this.faceStylized = true;
+    VRMRiggingHelper.applyStylizedFace(vrm, this.faceStylizationResult, vrmAvatar);
+    return this.faceStylizationResult;
   }
 
   /**
@@ -186,6 +257,10 @@ export class AvatarScanManager {
     }
 
     VRMRiggingHelper.applyScanExpressions(vrm, vrmAvatar);
+
+    if (this.faceStylized && this.faceStylizationResult) {
+      VRMRiggingHelper.applyStylizedFace(vrm, this.faceStylizationResult, vrmAvatar);
+    }
   }
 
   /**
@@ -258,5 +333,6 @@ export class AvatarScanManager {
     this._revokePreviews();
     this.stitchedTexture?.dispose();
     this.placeholderMesh = null;
+    this.faceStylizer.dispose();
   }
 }

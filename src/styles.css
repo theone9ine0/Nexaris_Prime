@@ -404,6 +404,39 @@ body {
   border-color: rgba(120, 255, 180, 0.45);
 }
 
+.scan-btn-stylize {
+  background: linear-gradient(135deg, #5533aa, #8866dd);
+  border-color: rgba(200, 150, 255, 0.5);
+}
+
+.scan-face-preview {
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 0.45rem;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(160, 120, 255, 0.35);
+}
+
+.scan-face-preview.hidden {
+  display: none;
+}
+
+.scan-face-preview-label {
+  display: block;
+  font-size: 0.65rem;
+  color: #c9a8ff;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+
+.scan-face-preview-img {
+  width: 100%;
+  max-height: 6rem;
+  object-fit: contain;
+  border-radius: 0.35rem;
+  background: rgba(10, 8, 20, 0.6);
+}
+
 .scan-chamber-banner {
   position: absolute;
   top: 1rem;

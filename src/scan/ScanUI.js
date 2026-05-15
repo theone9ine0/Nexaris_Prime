@@ -21,6 +21,7 @@ export class ScanUI {
    *   onGenerate?: () => void,
    *   onExport?: () => void,
    *   onEnterWorld?: () => void,
+   *   onStylizeFace?: () => void,
    * }} [callbacks]
    */
   constructor(container = document.getElementById('app'), callbacks = {}) {
@@ -37,7 +38,17 @@ export class ScanUI {
     const subtitle = document.createElement('p');
     subtitle.className = 'scan-ui-subtitle';
     subtitle.textContent =
-      'Upload stylized 360° reference photos. Nexaris will build a fictional VRM avatar (mock pipeline).';
+      'Upload 360° body photos + front face. Nexaris builds a fictional anime-stylized VRM (non-realistic).';
+
+    this.facePreviewWrap = document.createElement('div');
+    this.facePreviewWrap.className = 'scan-face-preview hidden';
+    const faceLabel = document.createElement('span');
+    faceLabel.className = 'scan-face-preview-label';
+    faceLabel.textContent = 'Stylized face preview';
+    this.facePreviewImg = document.createElement('img');
+    this.facePreviewImg.className = 'scan-face-preview-img';
+    this.facePreviewImg.alt = 'Stylized face';
+    this.facePreviewWrap.append(faceLabel, this.facePreviewImg);
 
     this.slotsEl = document.createElement('div');
     this.slotsEl.className = 'scan-slots';
@@ -77,6 +88,14 @@ export class ScanUI {
     this.generateBtn.disabled = true;
     this.generateBtn.addEventListener('click', () => this.callbacks.onGenerate?.());
 
+    this.stylizeBtn = document.createElement('button');
+    this.stylizeBtn.type = 'button';
+    this.stylizeBtn.className = 'scan-btn scan-btn-stylize';
+    this.stylizeBtn.textContent = 'Stylize Face';
+    this.stylizeBtn.disabled = true;
+    this.stylizeBtn.title = 'Anime-style face from your front photo (fictional, not realistic)';
+    this.stylizeBtn.addEventListener('click', () => this.callbacks.onStylizeFace?.());
+
     this.exportBtn = document.createElement('button');
     this.exportBtn.type = 'button';
     this.exportBtn.className = 'scan-btn';
@@ -91,9 +110,23 @@ export class ScanUI {
     this.worldBtn.disabled = true;
     this.worldBtn.addEventListener('click', () => this.callbacks.onEnterWorld?.());
 
-    actions.append(this.uploadBtn, this.generateBtn, this.exportBtn, this.worldBtn);
+    actions.append(
+      this.uploadBtn,
+      this.generateBtn,
+      this.stylizeBtn,
+      this.exportBtn,
+      this.worldBtn,
+    );
 
-    this.root.append(title, subtitle, this.slotsEl, this.statusEl, this.progressEl, actions);
+    this.root.append(
+      title,
+      subtitle,
+      this.facePreviewWrap,
+      this.slotsEl,
+      this.statusEl,
+      this.progressEl,
+      actions,
+    );
     this.container?.appendChild(this.root);
   }
 
@@ -146,13 +179,38 @@ export class ScanUI {
   _validate() {
     const set = this.getPhotoSet();
     const ready = REQUIRED_PHOTO_SLOTS.every((s) => set[s]);
+    const hasFront = !!set.front;
     this.generateBtn.disabled = !ready;
+    this.stylizeBtn.disabled = !hasFront;
     if (ready) {
       this.setStatus('Ready to generate stylized avatar.');
+    } else if (hasFront) {
+      this.setStatus('Front face ready — generate body or stylize face after scan.');
     } else {
       const missing = REQUIRED_PHOTO_SLOTS.filter((s) => !set[s]);
       this.setStatus(`Need: ${missing.join(', ')}`);
     }
+  }
+
+  /**
+   * @param {string} dataUrl
+   */
+  setFacePreview(dataUrl) {
+    this.facePreviewImg.src = dataUrl;
+    this.facePreviewWrap.classList.remove('hidden');
+  }
+
+  hideFacePreview() {
+    this.facePreviewImg.removeAttribute('src');
+    this.facePreviewWrap.classList.add('hidden');
+  }
+
+  /**
+   * @param {boolean} enabled
+   */
+  setStylizeEnabled(enabled) {
+    const set = this.getPhotoSet();
+    this.stylizeBtn.disabled = !enabled && !set.front;
   }
 
   /**
@@ -195,9 +253,10 @@ export class ScanUI {
   setComplete() {
     this.exportBtn.disabled = false;
     this.worldBtn.disabled = false;
+    this.stylizeBtn.disabled = !this.getPhotoSet().front;
     this.generateBtn.disabled = true;
     this.hideProgress();
-    this.setStatus('Avatar generated! Preview in chamber or enter the main world.');
+    this.setStatus('Avatar generated! Stylize face or enter the main world.');
   }
 
   show() {

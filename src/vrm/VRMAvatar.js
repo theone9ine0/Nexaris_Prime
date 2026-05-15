@@ -248,7 +248,64 @@ export class VRMAvatar {
     this.object.userData.scanPresentation = true;
   }
 
+  /**
+   * PR45 — apply stylized face presentation (blendshapes + metadata).
+   * @param {import('../stylizer/types.js').StylizedFaceParams} params
+   * @param {{ eyeGlow?: number, smileBias?: number }} [options]
+   */
+  applyStylizedFace(params, options = {}) {
+    this.object.userData.stylizedFace = true;
+    this.object.userData.stylizedFaceParams = params;
+
+    this.setScanExpressionProfile({
+      neutral: 0,
+      happy: (options.smileBias ?? 0.1),
+      relaxed: 0.04,
+    });
+
+    if (options.eyeGlow != null) {
+      this.setExpression('surprised', options.eyeGlow * 0.3);
+    }
+
+    this._stylizedFaceActive = true;
+  }
+
+  /**
+   * Preview a VRM blendshape by name (blink, smile, aa, etc.).
+   * @param {string} name
+   * @param {number} [duration=0.4]
+   */
+  previewFaceExpression(name, duration = 0.4) {
+    const resolved = resolveExpressionName(name);
+    this.playExpression(resolved, duration, 'neutral');
+  }
+
+  /**
+   * Cycle through mouth shapes for stylized face preview.
+   * @param {number} [intervalMs=450]
+   */
+  startMouthShapePreview(intervalMs = 450) {
+    this.stopMouthShapePreview();
+    const shapes = ['aa', 'ih', 'ou', 'ee', 'oh'];
+    let idx = 0;
+    this._mouthPreviewTimer = setInterval(() => {
+      this.previewFaceExpression(shapes[idx % shapes.length], intervalMs / 1000);
+      idx++;
+    }, intervalMs);
+  }
+
+  stopMouthShapePreview() {
+    if (this._mouthPreviewTimer) {
+      clearInterval(this._mouthPreviewTimer);
+      this._mouthPreviewTimer = null;
+    }
+    for (const s of ['aa', 'ih', 'ou', 'ee', 'oh', 'happy', 'angry', 'sad', 'surprised']) {
+      this.setExpression(s, 0);
+    }
+  }
+
   dispose() {
+    this.stopMouthShapePreview();
     this.clearTransformationBoost();
     this.clearTransformationExpressions();
     this._expressionWeights.clear();

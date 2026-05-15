@@ -250,6 +250,7 @@ export class ExampleScene extends SceneBase {
           ...scanSession.lastCustomization,
         };
         scanMgr.applyScanToVRM(vrm, avatar.vrmAvatar);
+        await scanMgr.restoreFaceStylization(vrm, avatar.vrmAvatar);
         await scanMgr.applyCustomizationToAvatar(avatar);
       }
 

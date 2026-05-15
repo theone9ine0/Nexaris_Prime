@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VRMFaceApplicator } from '../../stylizer/VRMFaceApplicator.js';
 
 /**
  * PR43 mock VRM rigging / metadata helpers (builds on PR35 loader output).
@@ -117,6 +118,21 @@ export class VRMRiggingHelper {
 
     vrm.scene.userData.scanTexture = texture;
     return texture;
+  }
+
+  /**
+   * @param {import('@pixiv/three-vrm').VRM} vrm
+   * @param {import('../vrm/VRMAvatar.js').VRMAvatar | null} vrmAvatar
+   */
+  /**
+   * PR45 — apply stylized anime face to VRM head.
+   * @param {import('@pixiv/three-vrm').VRM} vrm
+   * @param {import('../../stylizer/types.js').StylizedFaceResult} faceResult
+   * @param {import('../vrm/VRMAvatar.js').VRMAvatar | null} [vrmAvatar]
+   */
+  static applyStylizedFace(vrm, faceResult, vrmAvatar = null) {
+    VRMFaceApplicator.apply(vrm, faceResult, vrmAvatar);
+    vrm.scene.userData.faceStylized = true;
   }
 
   /**
