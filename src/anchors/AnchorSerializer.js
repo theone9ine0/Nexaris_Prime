@@ -141,7 +141,7 @@ export function getShardColor(shard) {
  *   label?: string,
  *   camera: THREE.PerspectiveCamera,
  *   shardManager?: import('../shards/ShardManager.js').ShardManager,
- *   clusterManager?: import('../world/ClusterManager.js').ClusterManager,
+ *   clusterManager?: import('../clusters/ClusterManager.js').ClusterManager,
  * }} source
  * @returns {AnchorSnapshot}
  */
