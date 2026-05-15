@@ -85,6 +85,36 @@ export class ChamberScene extends SceneBase {
       animation: 'pulse',
     });
 
+    this.shardManager.createVideoShard({
+      id: 'video_youtube',
+      mode: 'youtube',
+      youtubeId: 'LXbSed9PqqA',
+      title: 'Nexaris trailer',
+      position: { x: 0, y: 1.0, z: 1.5 },
+      rotation: { y: 0.05 },
+      width: 1.6,
+      height: 0.9,
+      autoplay: true,
+      loop: true,
+      mute: true,
+      animation: 'none',
+    });
+
+    this.shardManager.createVideoShard({
+      id: 'video_mp4',
+      mode: 'mp4',
+      src: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      title: 'Big Buck Bunny',
+      position: { x: -2.2, y: 0.2, z: 1.1 },
+      rotation: { y: 0.2 },
+      width: 1.4,
+      height: 0.79,
+      autoplay: true,
+      loop: true,
+      mute: true,
+      animation: 'none',
+    });
+
     this.clusterManager.createCluster({
       id: 'cluster_circle',
       layout: 'circle',

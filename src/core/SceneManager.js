@@ -194,7 +194,12 @@ export class SceneManager {
    * @returns {Promise<import('../scenes/SceneBase.js').SceneBase>}
    */
   async _activate(id) {
+    const registered = this._registry.get(id);
+    if (registered) {
+      registered.cssScene = this.cssScene;
+    }
     const scene = this.loadScene(id);
+    scene.shardManager?.setCssScene(this.cssScene);
     const prevId = this.previousSceneId ?? this.currentSceneId;
     scene.onEnter(prevId);
     this.currentScene = scene;

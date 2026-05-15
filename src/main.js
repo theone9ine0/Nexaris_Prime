@@ -25,6 +25,8 @@ const webglRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
 webglRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 webglRenderer.setSize(window.innerWidth, window.innerHeight);
 webglRenderer.setClearColor(0x000000, 1);
+webglRenderer.domElement.style.position = 'relative';
+webglRenderer.domElement.style.zIndex = '0';
 container.appendChild(webglRenderer.domElement);
 
 const cssRenderer = new CSS3DRenderer();
@@ -32,6 +34,7 @@ cssRenderer.setSize(window.innerWidth, window.innerHeight);
 cssRenderer.domElement.style.position = 'absolute';
 cssRenderer.domElement.style.inset = '0';
 cssRenderer.domElement.style.pointerEvents = 'none';
+cssRenderer.domElement.style.zIndex = '1';
 container.appendChild(cssRenderer.domElement);
 
 const inputSystem = new InputSystem({ domElement: webglRenderer.domElement });
@@ -61,7 +64,8 @@ const interactionSystem = new InteractionSystem({
 });
 
 interactionSystem.onClick((shard) => {
-  console.info('[interaction] click', shard.id, shard.metadata);
+  const playing = typeof shard.isPlaying === 'function' ? shard.isPlaying() : null;
+  console.info('[interaction] click', shard.id, shard.metadata, playing != null ? { playing } : {});
 });
 
 sceneManager.registerScene('chamber', new ChamberScene());

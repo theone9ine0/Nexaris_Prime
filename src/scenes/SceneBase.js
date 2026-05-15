@@ -16,6 +16,8 @@ export class SceneBase {
     this.cameraPosition = new THREE.Vector3(0, 0, 4);
     this.shardManager = null;
     this.clusterManager = null;
+    /** @type {THREE.Scene | null} CSS3D overlay scene (set by SceneManager) */
+    this.cssScene = null;
     this._built = false;
     this._elapsed = 0;
   }
@@ -29,7 +31,7 @@ export class SceneBase {
     this.scene.background = this.scene.background ?? new THREE.Color(0x000000);
     this.scene.userData.cameraPosition = this.cameraPosition;
 
-    this.shardManager = new ShardManager(this.scene);
+    this.shardManager = new ShardManager(this.scene, null, this.cssScene);
     this.clusterManager = new ClusterManager(this.scene);
     this._buildContent();
     this._built = true;
