@@ -9,6 +9,7 @@ import { AvatarScanManager } from '../scan/AvatarScanManager.js';
 import { PortalManager } from '../portals/PortalManager.js';
 import { SCAN_CHAMBER_SCENE_ID } from './ScanChamberScene.js';
 import { ACADEMY_SCENE_ID } from './academySceneIds.js';
+import { YOUR_PLACE_SCENE_ID } from '../social/types.js';
 
 const EXPRESSION_CYCLE = ['happy', 'angry', 'sad', 'surprised'];
 let _expressionIndex = 0;
@@ -151,6 +152,32 @@ export class ExampleScene extends SceneBase {
       radius: 0.9,
       frameStyle: 'arch',
       label: 'ACADEMY',
+    });
+
+    const social = this.sceneManagerRef?.socialService;
+    this.portalManager.createPortal({
+      id: 'portal_visit_friend_ex',
+      position: new THREE.Vector3(3, 1.2, 4),
+      color: 0xff88cc,
+      radius: 0.85,
+      frameStyle: 'crystal',
+      label: 'VISIT FRIEND',
+      onActivate: async () => {
+        if (!social) return;
+        try {
+          await social.visitFriendPortal(this.sceneManagerRef);
+        } catch (err) {
+          console.warn('[Example] Visit friend:', err.message);
+        }
+      },
+    });
+    this.portalManager.createPortal({
+      id: 'portal_your_place_ex',
+      targetSceneId: YOUR_PLACE_SCENE_ID,
+      position: new THREE.Vector3(-3, 1.2, 4),
+      color: 0xffaa88,
+      radius: 0.85,
+      label: 'YOUR PLACE',
     });
 
     this.interactionSystem?.rebuildTargets();

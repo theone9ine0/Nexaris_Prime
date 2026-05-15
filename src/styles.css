@@ -708,3 +708,188 @@ body {
 .academy-btn-stylize {
   background: linear-gradient(135deg, #5533aa, #8866dd);
 }
+
+/* PR52 — social / friends / party */
+.social-ui {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  width: min(20rem, calc(100% - 2rem));
+  max-height: calc(100% - 2rem);
+  overflow-y: auto;
+  z-index: 22;
+  pointer-events: auto;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(145deg, rgba(16, 12, 28, 0.94), rgba(8, 6, 18, 0.97));
+  border: 1px solid rgba(255, 140, 180, 0.35);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  font-family: system-ui, sans-serif;
+  color: #f0e8ff;
+  font-size: 0.75rem;
+}
+
+.social-ui.hidden {
+  display: none;
+}
+
+.social-header {
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  color: #ffb8d0;
+}
+
+.social-local-status {
+  font-size: 0.68rem;
+  color: rgba(200, 180, 220, 0.8);
+  margin-bottom: 0.55rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(255, 140, 180, 0.2);
+}
+
+.social-add-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-bottom: 0.55rem;
+}
+
+.social-input {
+  flex: 1;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.35rem;
+  border: 1px solid rgba(255, 140, 180, 0.35);
+  background: rgba(10, 8, 20, 0.8);
+  color: #fff;
+  font-size: 0.72rem;
+}
+
+.social-friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.65rem;
+  max-height: 10rem;
+  overflow-y: auto;
+}
+
+.social-friend-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.45rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 140, 180, 0.2);
+  background: rgba(30, 20, 45, 0.6);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.social-friend-row.selected {
+  border-color: rgba(255, 160, 200, 0.55);
+  background: rgba(60, 35, 80, 0.75);
+}
+
+.social-status-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.social-status-dot.online {
+  background: #66ff99;
+  box-shadow: 0 0 6px #66ff99;
+}
+
+.social-status-dot.offline {
+  background: #666;
+}
+
+.social-friend-name {
+  font-weight: 600;
+  font-size: 0.72rem;
+}
+
+.social-friend-status {
+  font-size: 0.62rem;
+  color: rgba(200, 180, 220, 0.75);
+  grid-column: 2 / 4;
+}
+
+.social-friend-remove {
+  padding: 0 0.35rem;
+  border: none;
+  background: transparent;
+  color: rgba(255, 120, 140, 0.8);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.social-party-title {
+  font-weight: 700;
+  color: #c9a8ff;
+  margin-bottom: 0.3rem;
+  font-size: 0.72rem;
+}
+
+.social-party-info {
+  font-size: 0.65rem;
+  color: rgba(200, 190, 230, 0.75);
+  margin-bottom: 0.45rem;
+}
+
+.social-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.social-btn {
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 140, 180, 0.35);
+  background: rgba(40, 28, 55, 0.85);
+  color: #f0e8ff;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.social-btn:hover {
+  background: rgba(70, 45, 95, 0.9);
+}
+
+.social-btn-visit {
+  background: linear-gradient(135deg, #aa4488, #cc66aa);
+}
+
+.social-btn-place {
+  background: linear-gradient(135deg, #886644, #cc9966);
+}
+
+.your-place-banner {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.45rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(20, 14, 10, 0.85);
+  border: 1px solid rgba(255, 180, 120, 0.4);
+  font-family: system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: rgba(255, 230, 210, 0.9);
+  pointer-events: none;
+  z-index: 19;
+}
+
+.your-place-banner.hidden {
+  display: none;
+}
+
+.your-place-banner strong {
+  color: #ffcc99;
+  font-weight: 700;
+}

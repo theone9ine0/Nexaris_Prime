@@ -32,6 +32,9 @@ import { modelManager } from './core/ModelManager.js';
 import { SAMPLE_ROBOT_GLB } from './assets/modelUrls.js';
 import { UIOverlay } from './ui/UIOverlay.js';
 import { DialogueManager } from './dialogue/DialogueManager.js';
+import { SocialService } from './social/SocialService.js';
+import { SocialUI } from './social/SocialUI.js';
+import { YourPlaceScene, YOUR_PLACE_SCENE_ID } from './scenes/YourPlaceScene.js';
 
 const container = document.getElementById('app');
 
@@ -97,6 +100,24 @@ const dialogueManager = new DialogueManager({
   getPlayer: () => sceneManager.currentScene?.player ?? null,
 });
 sceneManager.dialogueManager = dialogueManager;
+
+const socialService = new SocialService();
+sceneManager.socialService = socialService;
+
+const socialUI = new SocialUI(container, socialService, {
+  onVisitFriend: async (username) => {
+    try {
+      await socialService.visitFriendPortal(sceneManager, username);
+      await afterSceneSwitch(YOUR_PLACE_SCENE_ID);
+    } catch (err) {
+      console.warn('[Social]', err.message);
+    }
+  },
+  onVisitOwnPlace: async () => {
+    await socialService.visitOwnPlacePortal(sceneManager);
+    await afterSceneSwitch(YOUR_PLACE_SCENE_ID);
+  },
+});
 
 dialogueManager.onPauseChange = (paused) => {
   if (paused) {
@@ -180,6 +201,10 @@ const ACADEMY_SCENES = new Set([
   QUIZ_ARENA_SCENE_ID,
 ]);
 
+const yourPlaceScene = new YourPlaceScene();
+yourPlaceScene.mountUI(uiOverlay);
+sceneManager.registerScene(YOUR_PLACE_SCENE_ID, yourPlaceScene);
+
 const anchorManager = new AnchorManager({ sceneManager });
 
 const _lookTarget = new THREE.Vector3(0, 0, 0);
@@ -209,6 +234,64 @@ function setTraversalInputActive(active) {
 }
 
 /**
+ * @param {string} resolvedSceneId
+ */
+async function afterSceneSwitch(resolvedSceneId) {
+  interactionSystem.rebuildTargets();
+  syncCameraToScene();
+  socialService.onSceneChange(resolvedSceneId);
+
+  const isCombat = resolvedSceneId === 'combat_zone';
+  const isScan = resolvedSceneId === 'scan_chamber';
+  const isAcademy = ACADEMY_SCENES.has(resolvedSceneId);
+  const isYourPlace = resolvedSceneId === YOUR_PLACE_SCENE_ID;
+  const isChamber = resolvedSceneId === 'chamber';
+
+  interactionSystem.setEnabled(!isCombat);
+  setTraversalInputActive(true);
+
+  if (isCombat) combatHud.show();
+  else combatHud.hide();
+
+  if (isScan) {
+    scanChamberScene.mountScanUI(container, uiOverlay);
+    scanChamberScene.scanUI?.show();
+  } else {
+    scanChamberScene.scanUI?.hide();
+  }
+
+  if (isAcademy) {
+    academyController.show();
+    if (resolvedSceneId === ACADEMY_SCENE_ID) uiOverlay.showAcademyBanner();
+    else uiOverlay.hideAcademyBanner();
+  } else {
+    academyController.hide();
+    uiOverlay.hideAcademyBanner();
+  }
+
+  if (isYourPlace) {
+    uiOverlay.hideAcademyBanner();
+    uiOverlay.hideScanChamberBanner();
+    const target = socialService.getVisitTarget();
+    uiOverlay.showYourPlaceBanner(
+      target?.ownerDisplayName ?? 'Your Place',
+    );
+  } else {
+    uiOverlay.hideYourPlaceBanner();
+  }
+
+  if (isChamber) {
+    socialUI.show();
+  } else {
+    socialUI.hide();
+  }
+
+  if (sceneManager.currentScene?.player) {
+    webglRenderer.domElement.requestPointerLock?.();
+  }
+}
+
+/**
  * @param {string} id
  * @param {Parameters<SceneManager['transitionTo']>[1]} [options]
  */
@@ -221,41 +304,15 @@ async function switchScene(id, options) {
     transition: options?.transition ?? 'fade',
     duration: options?.duration ?? 0.8,
   });
-  interactionSystem.rebuildTargets();
-  syncCameraToScene();
   const resolved = sceneManager.resolveSceneId(id);
-  const isCombat = resolved === 'combat_zone';
-  const isScan = resolved === 'scan_chamber';
-  const isAcademy = ACADEMY_SCENES.has(resolved);
-  interactionSystem.setEnabled(!isCombat);
-  setTraversalInputActive(true);
-  if (isCombat) {
-    combatHud.show();
-  } else {
-    combatHud.hide();
-  }
-  if (isScan) {
-    scanChamberScene.mountScanUI(container, uiOverlay);
-    scanChamberScene.scanUI?.show();
-  } else {
-    scanChamberScene.scanUI?.hide();
-  }
-  if (isAcademy) {
-    academyController.show();
-    if (resolved === ACADEMY_SCENE_ID) uiOverlay.showAcademyBanner();
-    else uiOverlay.hideAcademyBanner();
-  } else {
-    academyController.hide();
-    uiOverlay.hideAcademyBanner();
-  }
-  if (sceneManager.currentScene?.player) {
-    webglRenderer.domElement.requestPointerLock?.();
-  }
+  await afterSceneSwitch(resolved);
 }
 
 async function boot() {
   setTraversalInputActive(false);
   await sceneManager.start('chamber');
+  socialService.onSceneChange('chamber');
+  socialUI.show();
   interactionSystem.rebuildTargets();
   syncCameraToScene();
   setTraversalInputActive(true);
@@ -287,6 +344,13 @@ inputSystem.on('keyDown', ({ code }) => {
   }
   if (code === 'Digit8') {
     switchScene(ACADEMY_SCENE_ID, { transition: 'warp', duration: 0.85 });
+  }
+  if (code === 'Digit9') {
+    socialUI.root.classList.toggle('hidden');
+  }
+  if (code === 'Digit0') {
+    socialService.prepareVisitOwnPlace();
+    switchScene(YOUR_PLACE_SCENE_ID, { transition: 'warp', duration: 0.85 });
   }
   if (code === 'KeyO' && !sceneManager.currentScene?.player) {
     cameraController.toggleMode();
@@ -345,6 +409,7 @@ function animate() {
   }
 
   dialogueManager.update(delta);
+  socialService.update(delta);
   sceneManager.update(delta);
   if (!dialogueManager.isActive) {
     cameraController.update(delta);

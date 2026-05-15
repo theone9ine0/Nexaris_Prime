@@ -38,9 +38,14 @@ export class UIOverlay {
     this.academyBanner.innerHTML =
       '<strong>Nexaris Academy</strong> — Flashcards · Lessons · Quizzes · Portals to chambers';
 
+    this.yourPlaceBanner = document.createElement('div');
+    this.yourPlaceBanner.className = 'your-place-banner hidden';
+    this.yourPlaceBanner.innerHTML = '<strong>Your Place</strong>';
+
     this.root.appendChild(this.panel);
     this.root.appendChild(this.scanBanner);
     this.root.appendChild(this.academyBanner);
+    this.root.appendChild(this.yourPlaceBanner);
     this.container?.appendChild(this.root);
 
     this._fullText = '';
@@ -148,6 +153,20 @@ export class UIOverlay {
 
   hideAcademyBanner() {
     this.academyBanner?.classList.add('hidden');
+  }
+
+  /**
+   * @param {string} title
+   */
+  showYourPlaceBanner(title = 'Your Place') {
+    if (this.yourPlaceBanner) {
+      this.yourPlaceBanner.innerHTML = `<strong>${title}</strong> — Personal dimension`;
+      this.yourPlaceBanner.classList.remove('hidden');
+    }
+  }
+
+  hideYourPlaceBanner() {
+    this.yourPlaceBanner?.classList.add('hidden');
   }
 
   hideDialogue() {

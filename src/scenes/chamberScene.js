@@ -4,6 +4,7 @@ import { NEXARIS_EFFECTS_PRESET } from '../effects/index.js';
 import { PortalManager } from '../portals/PortalManager.js';
 import { SCAN_CHAMBER_SCENE_ID } from './ScanChamberScene.js';
 import { ACADEMY_SCENE_ID } from './academySceneIds.js';
+import { YOUR_PLACE_SCENE_ID } from '../social/types.js';
 
 /**
  * Primary chamber dimension: orb, PR1 shards, PR2 clusters.
@@ -190,6 +191,42 @@ export class ChamberScene extends SceneBase {
       frameStyle: 'arch',
       label: 'ACADEMY',
     });
+    const social = this.sceneManagerRef?.socialService;
+
+    this.portalManager.createPortal({
+      id: 'portal_your_place',
+      position: new THREE.Vector3(-2.2, 1.1, -2.5),
+      color: 0xffaa88,
+      colorOuter: 0xffffff,
+      radius: 0.85,
+      frameStyle: 'ring',
+      label: 'YOUR PLACE',
+      onActivate: async () => {
+        if (!social) return;
+        await social.visitOwnPlacePortal(this.sceneManagerRef);
+      },
+    });
+    this.portalManager.createPortal({
+      id: 'portal_visit_friend',
+      position: new THREE.Vector3(2.2, 1.1, -2.5),
+      color: 0xff88cc,
+      colorOuter: 0xffffff,
+      radius: 0.85,
+      frameStyle: 'crystal',
+      label: 'VISIT FRIEND',
+      onActivate: async () => {
+        if (!social) {
+          console.warn('[Chamber] Social service unavailable');
+          return;
+        }
+        try {
+          await social.visitFriendPortal(this.sceneManagerRef);
+        } catch (err) {
+          console.warn('[Chamber] Visit friend:', err.message);
+        }
+      },
+    });
+
     this.interactionSystem?.rebuildTargets();
   }
 
