@@ -257,10 +257,11 @@ export class ExampleScene extends SceneBase {
       this._animationSystem.mixerManager,
       modelManager,
       this._animationSystem,
+      this.sceneManagerRef?.dialogueManager ?? null,
     );
 
     const spawns = [
-      { x: -4, z: 2, wanderRadius: 3.5, useVrm: true },
+      { x: -4, z: 2, wanderRadius: 3.5, useVrm: true, dialogueId: 'npc_intro' },
       { x: 4, z: 1, wanderRadius: 4, useVrm: false },
       { x: 0, z: -3, wanderRadius: 3, useVrm: false },
     ];
@@ -276,9 +277,9 @@ export class ExampleScene extends SceneBase {
           wanderRadius: s.wanderRadius,
           walkSpeed: 1.2,
           lookAtTarget: this.cameraController?.camera ?? null,
-          onInteract: () => {
-            console.info(`[NPC] npc_guard_${i} interact`);
-          },
+          dialogueId: s.dialogueId ?? null,
+          dialogueManager: this.sceneManagerRef?.dialogueManager ?? null,
+          speakerName: s.dialogueId ? 'Guide' : `Guard ${i}`,
         };
 
         let npc;
@@ -326,7 +327,6 @@ export class ExampleScene extends SceneBase {
       ?.getAllNPCs()
       .find((n) => n.id === target?.id || n._interactive === target);
     if (npc) {
-      npc.playExpression?.('angry', 0.45);
       npc.triggerInteract();
     }
   }

@@ -10,6 +10,8 @@ import { ExampleScene } from './scenes/ExampleScene.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 import { modelManager } from './core/ModelManager.js';
 import { SAMPLE_ROBOT_GLB } from './assets/modelUrls.js';
+import { UIOverlay } from './ui/UIOverlay.js';
+import { DialogueManager } from './dialogue/DialogueManager.js';
 
 const container = document.getElementById('app');
 
@@ -69,9 +71,40 @@ const interactionSystem = new InteractionSystem({
 
 sceneManager.interactionSystem = interactionSystem;
 
+const uiOverlay = new UIOverlay(container);
+const dialogueManager = new DialogueManager({
+  uiOverlay,
+  getPlayer: () => sceneManager.currentScene?.player ?? null,
+});
+sceneManager.dialogueManager = dialogueManager;
+
+dialogueManager.onPauseChange = (paused) => {
+  if (paused) {
+    cameraController.setInputActive(false);
+    interactionSystem.setEnabled(true);
+    document.exitPointerLock?.();
+  } else if (sceneManager.currentScene?.player) {
+    setTraversalInputActive(true);
+    if (sceneManager.currentSceneId === 'example') {
+      webglRenderer.domElement.requestPointerLock?.();
+    }
+  } else {
+    setTraversalInputActive(true);
+  }
+};
+
 interactionSystem.onClick((target) => {
   const scene = sceneManager.currentScene;
-  scene?.onInteractClick?.(target);
+
+  if (dialogueManager.isActive) {
+    if (target?.metadata?.type === 'npc') {
+      scene?.onInteractClick?.(target);
+    } else {
+      dialogueManager.next();
+    }
+  } else {
+    scene?.onInteractClick?.(target);
+  }
 
   const playing = typeof target.isPlaying === 'function' ? target.isPlaying() : null;
   console.info(
@@ -170,6 +203,10 @@ inputSystem.on('keyDown', ({ code }) => {
   if (code === 'KeyP' && anchorManager.has('default')) {
     console.info(anchorManager.toJSON('default'));
   }
+  if (dialogueManager.isActive && (code === 'Space' || code === 'Enter')) {
+    dialogueManager.next();
+    return;
+  }
   if (code === 'KeyG') {
     const scene = sceneManager.currentScene;
     if (scene?.requestNewDimension) {
@@ -203,8 +240,11 @@ function animate() {
     setTraversalInputActive(false);
   }
 
+  dialogueManager.update(delta);
   sceneManager.update(delta);
-  cameraController.update(delta);
+  if (!dialogueManager.isActive) {
+    cameraController.update(delta);
+  }
   interactionSystem.update(delta);
   sceneManager.render();
 

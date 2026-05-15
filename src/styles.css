@@ -33,3 +33,80 @@ body {
   transition: opacity 0.05s linear;
   pointer-events: none;
 }
+
+.ui-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.dialogue-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  width: min(36rem, calc(100% - 2rem));
+  padding: 1rem 1.25rem 1.1rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(145deg, rgba(12, 18, 36, 0.94), rgba(6, 10, 22, 0.96));
+  border: 1px solid rgba(120, 170, 255, 0.35);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+  color: #e8f0ff;
+}
+
+.dialogue-panel.hidden {
+  display: none;
+}
+
+.dialogue-speaker {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7eb8ff;
+  margin-bottom: 0.45rem;
+}
+
+.dialogue-text {
+  font-size: 1rem;
+  line-height: 1.55;
+  min-height: 3rem;
+}
+
+.dialogue-hint {
+  margin-top: 0.65rem;
+  font-size: 0.72rem;
+  color: rgba(200, 220, 255, 0.55);
+}
+
+.dialogue-hint.hidden,
+.dialogue-choices.hidden {
+  display: none;
+}
+
+.dialogue-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.dialogue-choice-btn {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(120, 170, 255, 0.4);
+  background: rgba(30, 50, 90, 0.6);
+  color: #e8f0ff;
+  font-size: 0.92rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dialogue-choice-btn:hover {
+  background: rgba(50, 90, 160, 0.75);
+  border-color: rgba(160, 200, 255, 0.7);
+}

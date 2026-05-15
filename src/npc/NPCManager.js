@@ -5,6 +5,7 @@ import { NPC } from './NPC.js';
  * @typedef {import('../core/ModelManager.js').ModelManager} ModelManager
  * @typedef {import('../core/AnimationMixerManager.js').AnimationMixerManager} AnimationMixerManager
  * @typedef {import('../core/AnimationSystem.js').AnimationSystem} AnimationSystem
+ * @typedef {import('../dialogue/DialogueManager.js').DialogueManager} DialogueManager
  */
 
 /**
@@ -20,12 +21,14 @@ export class NPCManager {
    * @param {AnimationMixerManager} mixerManager
    * @param {ModelManager} modelManager
    */
-  constructor(scene, mixerManager, modelManager, animationSystem = null) {
+  constructor(scene, mixerManager, modelManager, animationSystem = null, dialogueManager = null) {
     this.scene = scene;
     this.mixerManager = mixerManager;
     this.modelManager = modelManager;
     /** @type {AnimationSystem | null} */
     this.animationSystem = animationSystem;
+    /** @type {DialogueManager | null} */
+    this.dialogueManager = dialogueManager;
 
     /** @type {Set<import('./NPC.js').NPC>} */
     this.npcs = new Set();
@@ -62,6 +65,8 @@ export class NPCManager {
       animations,
       mixerManager: this.mixerManager,
       modelManager: this.modelManager,
+      animationSystem: options.animationSystem ?? this.animationSystem,
+      dialogueManager: options.dialogueManager ?? this.dialogueManager,
       id: options.id ?? `npc_${this._idCounter++}`,
       ...options,
     });

@@ -1,0 +1,18 @@
+{
+  "id": "npc_intro",
+  "lines": [
+    {
+      "speaker": "Guide",
+      "text": "Welcome to Nexaris. This dimension responds to your presence.",
+      "expression": "happy"
+    },
+    {
+      "speaker": "Guide",
+      "text": "I'm a sentinel of the example sector. What would you like to know?",
+      "choices": [
+        { "text": "Tell me more.", "next": "npc_more" },
+        { "text": "Goodbye.", "next": "end" }
+      ]
+    }
+  ]
+}

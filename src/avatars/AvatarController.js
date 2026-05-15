@@ -93,6 +93,7 @@ export class AvatarController {
     this._grounded = true;
     this._isRunning = false;
     this._locomotionState = 'idle';
+    this.dialoguePaused = false;
 
     this._forward = new THREE.Vector3();
     this._right = new THREE.Vector3();
@@ -218,6 +219,9 @@ export class AvatarController {
    */
   update(deltaTime) {
     const dt = Math.min(deltaTime, 0.05);
+    if (this.dialoguePaused) {
+      return;
+    }
     this._updateMovement(dt);
     this._updateLocomotionAnimation();
     this._updateVRMFollowCamera();

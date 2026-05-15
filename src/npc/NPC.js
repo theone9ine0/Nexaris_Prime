@@ -9,7 +9,7 @@ import {
 
 const _UP = new THREE.Vector3(0, 1, 0);
 
-/** @typedef {'idle' | 'wander' | 'followPlayer' | 'interact'} NPCState */
+/** @typedef {'idle' | 'wander' | 'followPlayer' | 'interact' | 'dialogue'} NPCState */
 
 /**
  * @typedef {import('../core/AnimationMixerManager.js').AnimationMixerManager} AnimationMixerManager
@@ -19,6 +19,7 @@ const _UP = new THREE.Vector3(0, 1, 0);
  * @typedef {import('../vrm/VRMAvatar.js').VRMAvatar} VRMAvatar
  * @typedef {import('../core/AnimationSystem.js').AnimationSystem} AnimationSystem
  * @typedef {import('@pixiv/three-vrm').VRM} VRM
+ * @typedef {import('../dialogue/DialogueManager.js').DialogueManager} DialogueManager
  */
 
 /**
@@ -43,6 +44,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
  *   followDistance?: number,
  *   followStopDistance?: number,
  *   initialState?: NPCState,
+ *   dialogueId?: string,
+ *   dialogueManager?: DialogueManager,
+ *   speakerName?: string,
  *   onInteract?: () => void,
  * }} NPCOptions
  */
@@ -75,13 +79,22 @@ export class NPC {
     this.followStopDistance = options.followStopDistance ?? 1.8;
 
     this.onInteract = options.onInteract ?? null;
+    this.dialogueId = options.dialogueId ?? null;
+    this.dialogueManager = options.dialogueManager ?? null;
+    this.speakerName = options.speakerName ?? this.id;
 
     /** @type {NPCState} */
     this.state = options.initialState ?? 'idle';
+    /** @type {NPCState | null} */
+    this._preDialogueState = null;
     /** @type {THREE.Object3D | null} */
     this.target = null;
 
-    this.metadata = { title: this.id, type: 'npc', payload: null };
+    this.metadata = {
+      title: options.speakerName ?? this.id,
+      type: 'npc',
+      payload: { dialogueId: this.dialogueId },
+    };
 
     this._wanderOrigin = this.object.position.clone();
     this._wanderTarget = new THREE.Vector3();
@@ -138,6 +151,8 @@ export class NPC {
     if (this.vrmAvatar && this._animationSystem) {
       this._animationSystem.registerVRMAvatar(this.vrmAvatar);
     }
+
+    this._savedLookAtTarget = options.lookAtTarget ?? null;
 
     this._setupInteraction();
   }
@@ -238,7 +253,55 @@ export class NPC {
     }
   }
 
+  /**
+   * @param {THREE.Object3D | null} playerObject
+   */
+  enterDialogue(playerObject) {
+    this._preDialogueState = this.state;
+    this.state = 'dialogue';
+    this._velocity.set(0, 0, 0);
+    this._wantsWander = false;
+
+    if (playerObject) {
+      this.vrmAvatar?.setLookAtTarget(playerObject);
+      const dir = this._scratchDir();
+      playerObject.getWorldPosition(dir);
+      dir.sub(this.object.position);
+      dir.y = 0;
+      if (dir.lengthSq() > 1e-4) {
+        this.object.rotation.y = Math.atan2(dir.x, dir.z);
+      }
+    }
+  }
+
+  exitDialogue() {
+    const restore = this._preDialogueState ?? 'idle';
+    this._preDialogueState = null;
+    this.setState(restore);
+    this.vrmAvatar?.setLookAtTarget(this._savedLookAtTarget ?? null);
+  }
+
+  playDialogueEmote() {
+    const emote = this._clips.emote ?? this._clips.idle;
+    if (emote) {
+      this.stateMachine.triggerOneShot(emote, {
+        returnTo: 'idle',
+        fadeIn: 0.12,
+      });
+    }
+  }
+
   triggerInteract() {
+    if (this.dialogueId && this.dialogueManager) {
+      if (this.dialogueManager.isActive) {
+        this.dialogueManager.next();
+        return;
+      }
+      this.dialogueManager.startDialogue(this, this.dialogueId);
+      this.onInteract?.();
+      return;
+    }
+
     const emote = this._clips.emote ?? this._clips.idle;
     if (!emote) return;
 
@@ -284,6 +347,8 @@ export class NPC {
         this._updateFollowPlayer(dt);
         break;
       case 'interact':
+      case 'dialogue':
+        this._velocity.lerp(new THREE.Vector3(), 1 - Math.exp(-10 * dt));
         break;
       default:
         break;
@@ -404,7 +469,7 @@ export class NPC {
       next = speed > this.walkSpeed * 0.85 ? 'run' : 'walk';
     }
 
-    if (this.state === 'interact') {
+    if (this.state === 'interact' || this.state === 'dialogue') {
       return;
     }
 

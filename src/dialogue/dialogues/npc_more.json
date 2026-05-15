@@ -1,0 +1,21 @@
+{
+  "id": "npc_more",
+  "lines": [
+    {
+      "speaker": "Guide",
+      "text": "Nexaris Prime links chambers, voids, and procedurally generated worlds.",
+      "expression": "relaxed"
+    },
+    {
+      "speaker": "Guide",
+      "text": "Press G to weave a new multiverse. Press 1–3 to shift dimensions.",
+      "emote": true,
+      "expression": "happy"
+    },
+    {
+      "speaker": "Guide",
+      "text": "May your shards stay luminous, traveler.",
+      "next": "end"
+    }
+  ]
+}

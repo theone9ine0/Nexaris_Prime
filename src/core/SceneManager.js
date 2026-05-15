@@ -61,6 +61,9 @@ export class SceneManager {
 
     this.multiverseGenerator = new MultiverseGenerator({ sceneManager: this });
 
+    /** @type {import('../dialogue/DialogueManager.js').DialogueManager | null} */
+    this.dialogueManager = null;
+
     this._elapsed = 0;
     /** @type {TransitionState | null} */
     this._transition = null;
@@ -438,6 +441,8 @@ export class SceneManager {
     if (this._transition) {
       this._advanceTransition(delta);
     }
+
+    this.dialogueManager?.update(delta);
 
     this.currentScene?.update(delta);
     this.animationSystem?.update(delta);
