@@ -170,6 +170,20 @@ inputSystem.on('keyDown', ({ code }) => {
   if (code === 'KeyP' && anchorManager.has('default')) {
     console.info(anchorManager.toJSON('default'));
   }
+  if (code === 'KeyG') {
+    const scene = sceneManager.currentScene;
+    if (scene?.requestNewDimension) {
+      scene.requestNewDimension();
+    } else if (scene?._generateMultiverse) {
+      scene._generateMultiverse();
+    } else if (sceneManager.currentSceneId === 'example') {
+      sceneManager.generateAndLoad(Date.now(), {
+        preservePlayer: true,
+        transition: 'warp',
+        duration: 0.9,
+      });
+    }
+  }
 });
 
 function onResize() {

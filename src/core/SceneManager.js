@@ -3,6 +3,7 @@ import { applyEasing } from '../animation/Easing.js';
 import { EffectsManager } from '../effects/index.js';
 import { AnimationSystem } from './AnimationSystem.js';
 import { modelManager } from './ModelManager.js';
+import { MultiverseGenerator } from '../multiverse/MultiverseGenerator.js';
 
 /**
  * @typedef {'fade' | 'warp'} TransitionType
@@ -57,6 +58,8 @@ export class SceneManager {
 
     this.effectsManager = null;
     this.animationSystem = null;
+
+    this.multiverseGenerator = new MultiverseGenerator({ sceneManager: this });
 
     this._elapsed = 0;
     /** @type {TransitionState | null} */
@@ -154,8 +157,63 @@ export class SceneManager {
     if (!scene) {
       throw new Error(`Scene not registered: ${id}`);
     }
-    scene.build();
+    if (!scene._built) {
+      scene.build();
+    }
     return scene;
+  }
+
+  /**
+   * Remove a registered scene (disposes if not active).
+   * @param {string} id
+   * @returns {boolean}
+   */
+  unregisterScene(id) {
+    if (this.currentSceneId === id) return false;
+    const scene = this._registry.get(id);
+    if (!scene) return false;
+    scene.dispose();
+    this._registry.delete(id);
+    return true;
+  }
+
+  /**
+   * Procedurally generate and activate a new dimension (PR29).
+   * @param {number} [seed]
+   * @param {{
+   *   preservePlayer?: boolean,
+   *   parentSeed?: number,
+   *   transition?: TransitionType,
+   *   duration?: number,
+   * }} [options]
+   * @returns {Promise<import('../scenes/SceneBase.js').SceneBase>}
+   */
+  async generateAndLoad(seed, options = {}) {
+    /** @type {import('../avatars/AvatarController.js').AvatarController | null} */
+    let preservedPlayer = null;
+    if (options.preservePlayer !== false && this.currentScene?.player) {
+      preservedPlayer = this.currentScene.player;
+      preservedPlayer.object.parent?.remove(preservedPlayer.object);
+      this.currentScene.setPlayer(null);
+    }
+
+    const result = this.multiverseGenerator.generate(seed ?? Date.now());
+    result.scene.setPreservedPlayer(preservedPlayer);
+    result.scene.sceneManagerRef = this;
+
+    this.registerScene(result.id, result.scene);
+
+    const transition = options.transition ?? 'warp';
+    const duration = options.duration ?? 0.9;
+
+    if (this.currentScene) {
+      await this.transitionTo(result.id, { transition, duration, force: true });
+    } else {
+      await this.start(result.id);
+    }
+
+    this.interactionSystem?.rebuildTargets();
+    return /** @type {import('../scenes/SceneBase.js').SceneBase} */ (this.currentScene);
   }
 
   /**
@@ -211,6 +269,7 @@ export class SceneManager {
     }
     const scene = this.loadScene(id);
     scene.shardManager?.setCssScene(this.cssScene);
+    scene.sceneManagerRef = this;
     const prevId = this.previousSceneId ?? this.currentSceneId;
     this.currentScene = scene;
     this.currentSceneId = id;

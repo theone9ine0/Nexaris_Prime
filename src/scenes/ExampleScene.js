@@ -24,6 +24,8 @@ export class ExampleScene extends SceneBase {
     this._animationSystem = null;
     this._avatarLoading = false;
     this._npcsLoading = false;
+    this._keyHandler = null;
+    this._generating = false;
   }
 
   _buildContent() {
@@ -81,6 +83,7 @@ export class ExampleScene extends SceneBase {
   }
 
   onExit(nextSceneId) {
+    this._unbindKeyHandler();
     this.cameraController?.clearFollowTarget();
     super.onExit(nextSceneId);
   }
@@ -97,6 +100,43 @@ export class ExampleScene extends SceneBase {
 
     if (!this.npcManager && !this._npcsLoading) {
       this._spawnNPCs();
+    }
+
+    this._bindKeyHandler();
+  }
+
+  _bindKeyHandler() {
+    if (!this.inputSystem || this._keyHandler) return;
+    this._keyHandler = ({ code }) => {
+      if (code === 'KeyG') {
+        this._generateMultiverse();
+      }
+    };
+    this.inputSystem.on('keyDown', this._keyHandler);
+  }
+
+  _unbindKeyHandler() {
+    if (this._keyHandler && this.inputSystem) {
+      this.inputSystem.off('keyDown', this._keyHandler);
+      this._keyHandler = null;
+    }
+  }
+
+  async _generateMultiverse() {
+    if (this._generating || !this.sceneManagerRef) return;
+    this._generating = true;
+    try {
+      const seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
+      await this.sceneManagerRef.generateAndLoad(seed, {
+        preservePlayer: true,
+        transition: 'warp',
+        duration: 0.9,
+      });
+      console.info(`[ExampleScene] Generated dimension (seed ${seed})`);
+    } catch (err) {
+      console.warn('[ExampleScene] Multiverse generation failed:', err);
+    } finally {
+      this._generating = false;
     }
   }
 
