@@ -8,6 +8,8 @@ import { ChamberScene } from './scenes/chamberScene.js';
 import { VoidScene } from './scenes/voidScene.js';
 import { ExampleScene } from './scenes/ExampleScene.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
+import { modelManager } from './core/ModelManager.js';
+import { SAMPLE_FOX_GLB } from './assets/modelUrls.js';
 
 const container = document.getElementById('app');
 
@@ -67,6 +69,8 @@ interactionSystem.onClick((shard) => {
   const playing = typeof shard.isPlaying === 'function' ? shard.isPlaying() : null;
   console.info('[interaction] click', shard.id, shard.metadata, playing != null ? { playing } : {});
 });
+
+modelManager.preload([SAMPLE_FOX_GLB]).catch(() => {});
 
 sceneManager.registerScene('chamber', new ChamberScene());
 sceneManager.registerScene('void', new VoidScene());

@@ -18,6 +18,8 @@ export class SceneBase {
     this.clusterManager = null;
     /** @type {THREE.Scene | null} CSS3D overlay scene (set by SceneManager) */
     this.cssScene = null;
+    /** @type {import('../core/ModelManager.js').ModelManager | null} */
+    this.modelManager = null;
     this._built = false;
     this._elapsed = 0;
   }

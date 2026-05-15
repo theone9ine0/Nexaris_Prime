@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { applyEasing } from '../animation/Easing.js';
 import { EffectsManager } from '../effects/index.js';
 import { AnimationSystem } from './AnimationSystem.js';
+import { modelManager } from './ModelManager.js';
 
 /**
  * @typedef {'fade' | 'warp'} TransitionType
@@ -197,6 +198,7 @@ export class SceneManager {
     const registered = this._registry.get(id);
     if (registered) {
       registered.cssScene = this.cssScene;
+      registered.modelManager = modelManager;
     }
     const scene = this.loadScene(id);
     scene.shardManager?.setCssScene(this.cssScene);
