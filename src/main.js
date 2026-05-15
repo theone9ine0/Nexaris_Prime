@@ -3,6 +3,7 @@ import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import { SceneManager } from './core/SceneManager.js';
 import { CameraController } from './core/CameraController.js';
 import { InputSystem } from './core/InputSystem.js';
+import { InteractionSystem } from './core/InteractionSystem.js';
 import { ChamberScene } from './scenes/chamberScene.js';
 import { VoidScene } from './scenes/voidScene.js';
 import { ExampleScene } from './scenes/ExampleScene.js';
@@ -52,6 +53,17 @@ const cameraController = new CameraController({
   dampingFactor: 10,
 });
 
+const interactionSystem = new InteractionSystem({
+  camera,
+  domElement: webglRenderer.domElement,
+  inputSystem,
+  getScene: () => sceneManager.currentScene,
+});
+
+interactionSystem.onClick((shard) => {
+  console.info('[interaction] click', shard.id, shard.metadata);
+});
+
 sceneManager.registerScene('chamber', new ChamberScene());
 sceneManager.registerScene('void', new VoidScene());
 sceneManager.registerScene('example', new ExampleScene());
@@ -72,8 +84,10 @@ function syncCameraToScene() {
 
 function setTraversalInputActive(active) {
   cameraController.setInputActive(active);
+  interactionSystem.setEnabled(active);
   if (!active) {
     inputSystem.clearFrameState();
+    interactionSystem.reset();
   }
 }
 
@@ -84,6 +98,7 @@ function setTraversalInputActive(active) {
 async function switchScene(id, options) {
   setTraversalInputActive(false);
   await sceneManager.transitionTo(id, options);
+  interactionSystem.rebuildTargets();
   syncCameraToScene();
   setTraversalInputActive(true);
 }
@@ -91,6 +106,7 @@ async function switchScene(id, options) {
 async function boot() {
   setTraversalInputActive(false);
   await sceneManager.start('chamber');
+  interactionSystem.rebuildTargets();
   syncCameraToScene();
   setTraversalInputActive(true);
 }
@@ -147,6 +163,7 @@ function animate() {
 
   sceneManager.update(delta);
   cameraController.update(delta);
+  interactionSystem.update(delta);
   sceneManager.render();
 
   inputSystem.update();

@@ -7,7 +7,14 @@ import {
 } from '../core/animationHelpers.js';
 
 /**
- * @typedef {{
+ * @typedef {Object} ShardMetadata
+ * @property {string} [title]
+ * @property {string} [type]
+ * @property {unknown} [payload]
+ */
+
+/**
+ * @typedef {ShardMetadata & {
  *   id: string,
  *   position?: { x?: number, y?: number, z?: number },
  *   rotation?: { x?: number, y?: number, z?: number },
@@ -22,7 +29,7 @@ import {
 
 /**
  * Foundational Nexaris object: a textured or colored 3D plane.
- * Animation is driven by {@link import('../core/AnimationSystem.js').AnimationSystem}.
+ * Implements PR12 interaction callbacks for hover, click, and selection.
  */
 export class Shard {
   /**
@@ -36,9 +43,16 @@ export class Shard {
     this.id = options.id;
     this.animation = options.animation ?? 'pulse';
 
+    this.metadata = {
+      title: options.title ?? this.id,
+      type: options.type ?? 'shard',
+      payload: options.payload ?? null,
+    };
+
     const width = options.width ?? 1;
     const height = options.height ?? 1;
     const geometry = new THREE.PlaneGeometry(width, height);
+    geometry.computeBoundingSphere();
 
     if (options.texture) {
       options.texture.colorSpace = THREE.SRGBColorSpace;
@@ -61,18 +75,29 @@ export class Shard {
       });
     }
 
+    this._baseEmissiveIntensity =
+      'emissiveIntensity' in this._material ? this._material.emissiveIntensity : 0;
+
     this.mesh = new THREE.Mesh(geometry, this._material);
-    this.mesh.userData = { type: 'shard', shardId: this.id };
+    this.mesh.userData = {
+      type: 'shard',
+      shardId: this.id,
+      interactive: this,
+    };
 
     this.root = new THREE.Group();
     this.root.name = `shard:${this.id}`;
-    this.root.userData = { type: 'shard', shardId: this.id };
+    this.root.userData = { type: 'shard', shardId: this.id, interactive: this };
     this.root.add(this.mesh);
 
     this._applyTransform(options);
     this._basePosition = this.root.position.clone();
     this._baseRotation = this.root.rotation.clone();
     this._baseScale = this.root.scale.clone();
+
+    this._hovered = false;
+    this._selected = false;
+    this._clickFlash = 0;
 
     /** @type {import('../core/animationHelpers.js').AnimationState[]} */
     this._animations = this._buildAnimations();
@@ -84,9 +109,7 @@ export class Shard {
   _buildAnimations() {
     if (this.animation === 'none') return [];
 
-    const list = [
-      floatAnimation(this.root, 0.06, 1.2),
-    ];
+    const list = [floatAnimation(this.root, 0.06, 1.2)];
 
     if (this.animation === 'pulse' || this.animation === 'both') {
       list.push(pulseAnimation(this.root, 0.05, 2.5));
@@ -121,6 +144,52 @@ export class Shard {
     }
   }
 
+  onHoverEnter() {
+    this._hovered = true;
+    this._applyInteractionEmissive();
+  }
+
+  onHoverExit() {
+    this._hovered = false;
+    this._applyInteractionEmissive();
+  }
+
+  onClick() {
+    this._clickFlash = 0.35;
+    this._applyInteractionEmissive();
+  }
+
+  onSelect() {
+    this._selected = true;
+    this._applyInteractionEmissive();
+  }
+
+  onDeselect() {
+    this._selected = false;
+    this._applyInteractionEmissive();
+  }
+
+  /**
+   * Boost emissive on top of animation-driven glow.
+   */
+  _applyInteractionEmissive() {
+    if (!('emissiveIntensity' in this._material)) return;
+
+    let boost = 0;
+    if (this._hovered) boost += 0.35;
+    if (this._selected) boost += 0.5;
+    if (this._clickFlash > 0) {
+      boost += 0.65 * Math.sin((1 - this._clickFlash / 0.35) * Math.PI);
+    }
+
+    const glowAnim = this._animations.find((a) => a.type === 'glowPulse');
+    const base = glowAnim
+      ? this._material.emissiveIntensity
+      : this._baseEmissiveIntensity;
+
+    this._material.emissiveIntensity = base + boost;
+  }
+
   addTo(parent) {
     parent.add(this.root);
   }
@@ -143,8 +212,17 @@ export class Shard {
    * @param {number} deltaTime
    */
   updateAnimation(deltaTime) {
-    if (this._animations.length === 0) return;
-    applyAnimations(this._animations, deltaTime);
+    if (this._clickFlash > 0) {
+      this._clickFlash = Math.max(0, this._clickFlash - deltaTime);
+    }
+
+    if (this._animations.length > 0) {
+      applyAnimations(this._animations, deltaTime);
+    }
+
+    if (this._hovered || this._selected || this._clickFlash > 0) {
+      this._applyInteractionEmissive();
+    }
   }
 
   /** @deprecated Use AnimationSystem */

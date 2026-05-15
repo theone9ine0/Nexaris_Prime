@@ -4,6 +4,7 @@
 export { AnimationSystem } from './AnimationSystem.js';
 export { CameraController } from './CameraController.js';
 export { InputSystem } from './InputSystem.js';
+export { InteractionSystem } from './InteractionSystem.js';
 export {
   floatAnimation,
   pulseAnimation,
