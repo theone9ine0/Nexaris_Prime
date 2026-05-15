@@ -94,6 +94,12 @@ export class AvatarController {
     this._isRunning = false;
     this._locomotionState = 'idle';
     this.dialoguePaused = false;
+    /** When true, locomotion is handled externally (combat dash/attacks). */
+    this.combatPaused = false;
+    /** Combat zone: Space triggers dash instead of jump. */
+    this.combatMode = false;
+    /** @type {import('../combat/CombatController.js').CombatController | null} */
+    this.combatController = null;
 
     this._forward = new THREE.Vector3();
     this._right = new THREE.Vector3();
@@ -219,7 +225,7 @@ export class AvatarController {
    */
   update(deltaTime) {
     const dt = Math.min(deltaTime, 0.05);
-    if (this.dialoguePaused) {
+    if (this.dialoguePaused || this.combatPaused) {
       return;
     }
     this._updateMovement(dt);
@@ -297,6 +303,7 @@ export class AvatarController {
     this.object.position.z += this._horizontalVelocity.z * dt;
 
     if (
+      !this.combatMode &&
       input.isKeyDown('Space') &&
       this._grounded &&
       this._clips.jump &&

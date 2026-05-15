@@ -33,4 +33,8 @@ export const HUMANOID_CLIP_PATTERNS = {
   run: ['Run', 'Running', 'run'],
   jump: ['Jump', 'jump'],
   emote: ['Punch', 'Wave', 'ThumbsUp', 'thumbs', 'emote'],
+  light: ['Punch', 'Attack', 'Strike', 'light'],
+  heavy: ['Kick', 'Heavy', 'Smash', 'heavy'],
+  dash: ['Dash', 'Roll', 'Dodge', 'Jump', 'jump'],
+  hitReact: ['Hit', 'Stagger', 'Hurt', 'Damage'],
 };

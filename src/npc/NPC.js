@@ -104,6 +104,7 @@ export class NPC {
     this._idleUntil = 0;
     this._lookPhase = Math.random() * Math.PI * 2;
     this._arriveThreshold = 0.35;
+    this.combatPaused = false;
 
     const animations = options.animations ?? [];
     const clipNames = animations.map((c) => c.name);
@@ -335,6 +336,12 @@ export class NPC {
    */
   update(deltaTime) {
     const dt = Math.min(deltaTime, 0.05);
+
+    if (this.combatPaused) {
+      this._velocity.lerp(new THREE.Vector3(), 1 - Math.exp(-10 * dt));
+      this.object.position.y = this.groundY;
+      return;
+    }
 
     switch (this.state) {
       case 'idle':

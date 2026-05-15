@@ -9,6 +9,8 @@ import { VoidScene } from './scenes/voidScene.js';
 import { ExampleScene } from './scenes/ExampleScene.js';
 import { CrystalCavernScene } from './scenes/crystalCavernScene.js';
 import { RetroConsoleScene } from './scenes/retroConsoleScene.js';
+import { CombatZoneScene } from './scenes/CombatZoneScene.js';
+import { CombatHUD } from './combat/CombatHUD.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 import { modelManager } from './core/ModelManager.js';
 import { SAMPLE_ROBOT_GLB } from './assets/modelUrls.js';
@@ -125,6 +127,11 @@ sceneManager.registerScene('example', new ExampleScene());
 sceneManager.registerScene('crystal_cave', new CrystalCavernScene());
 sceneManager.registerScene('retro_console', new RetroConsoleScene());
 
+const combatZoneScene = new CombatZoneScene();
+const combatHud = new CombatHUD(container);
+combatZoneScene.setCombatHud(combatHud);
+sceneManager.registerScene('combat_zone', combatZoneScene);
+
 const anchorManager = new AnchorManager({ sceneManager });
 
 const _lookTarget = new THREE.Vector3(0, 0, 0);
@@ -168,7 +175,14 @@ async function switchScene(id, options) {
   });
   interactionSystem.rebuildTargets();
   syncCameraToScene();
+  const isCombat = id === 'combat_zone';
+  interactionSystem.setEnabled(!isCombat);
   setTraversalInputActive(true);
+  if (isCombat) {
+    combatHud.show();
+  } else {
+    combatHud.hide();
+  }
   if (sceneManager.currentScene?.player) {
     webglRenderer.domElement.requestPointerLock?.();
   }
@@ -199,6 +213,9 @@ inputSystem.on('keyDown', ({ code }) => {
   }
   if (code === 'Digit5') {
     switchScene('retro_console', { transition: 'warp', duration: 0.85 });
+  }
+  if (code === 'Digit6') {
+    switchScene('combat_zone', { transition: 'warp', duration: 0.85 });
   }
   if (code === 'KeyO' && !sceneManager.currentScene?.player) {
     cameraController.toggleMode();
