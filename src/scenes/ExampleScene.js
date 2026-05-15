@@ -4,6 +4,7 @@ import { modelManager } from '../core/ModelManager.js';
 import { AvatarController } from '../avatars/AvatarController.js';
 import { NPCManager } from '../npc/NPCManager.js';
 import { SAMPLE_ROBOT_GLB, SAMPLE_VRM_URL } from '../assets/modelUrls.js';
+import { PortalManager } from '../portals/PortalManager.js';
 
 const EXPRESSION_CYCLE = ['happy', 'angry', 'sad', 'surprised'];
 let _expressionIndex = 0;
@@ -77,6 +78,7 @@ export class ExampleScene extends SceneBase {
 
   onEnter(previousSceneId) {
     super.onEnter(previousSceneId);
+    this._setupPortals();
     if (this.player) {
       this.cameraController?.followTarget(this.player.object);
     }
@@ -103,6 +105,31 @@ export class ExampleScene extends SceneBase {
     }
 
     this._bindKeyHandler();
+    this._setupPortals();
+  }
+
+  _setupPortals() {
+    if (!this.sceneManagerRef || this.portalManager) return;
+
+    this.portalManager = new PortalManager(this.scene, this.sceneManagerRef);
+    this.portalManager.createPortal({
+      id: 'portal_crystal',
+      targetSceneId: 'crystal_cave',
+      position: new THREE.Vector3(-6, 1.3, -2),
+      color: 0xaa66ff,
+      radius: 1,
+      frameStyle: 'ring',
+    });
+    this.portalManager.createPortal({
+      id: 'portal_retro',
+      targetSceneId: 'retro_console',
+      position: new THREE.Vector3(6, 1.3, -2),
+      color: 0x00ff88,
+      radius: 1,
+      frameStyle: 'arch',
+    });
+
+    this.interactionSystem?.rebuildTargets();
   }
 
   _bindKeyHandler() {

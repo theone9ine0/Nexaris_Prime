@@ -442,8 +442,9 @@ export class MultiverseGenerator {
         ),
         targetSeed,
         color: template.palette.accent,
+        sceneManager: this.sceneManager,
         onActivate: (p) => {
-          if (!this.sceneManager) return;
+          if (!this.sceneManager || p.targetSeed == null) return;
           this.sceneManager.generateAndLoad(p.targetSeed, {
             preservePlayer: true,
             parentSeed,

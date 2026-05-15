@@ -225,6 +225,72 @@ export class SceneManager {
   /**
    * @param {{ skipOnExit?: boolean }} [options]
    */
+  /** @deprecated use unloadCurrentScene */
+  unloadScene(options = {}) {
+    this.unloadCurrentScene(options);
+  }
+
+  /**
+   * Transition to a scene via portal — preserves player and spawns at target spawn point.
+   * @param {string} targetSceneId
+   * @param {{
+   *   preservePlayer?: boolean,
+   *   transition?: TransitionType,
+   *   duration?: number,
+   *   spawnPoint?: THREE.Vector3,
+   * }} [options]
+   */
+  async transitionViaPortal(targetSceneId, options = {}) {
+    if (!this._registry.has(targetSceneId)) {
+      throw new Error(`Scene not registered: ${targetSceneId}`);
+    }
+    if (this.isTransitioning()) {
+      return this.currentScene;
+    }
+
+    /** @type {import('../avatars/AvatarController.js').AvatarController | null} */
+    let preservedPlayer = null;
+    if (options.preservePlayer !== false && this.currentScene?.player) {
+      preservedPlayer = this.currentScene.player;
+      preservedPlayer.object.parent?.remove(preservedPlayer.object);
+      this.currentScene.setPlayer(null);
+    }
+
+    await this.transitionTo(targetSceneId, {
+      transition: options.transition ?? 'warp',
+      duration: options.duration ?? 0.85,
+      force: true,
+    });
+
+    if (preservedPlayer && this.currentScene) {
+      const targetScene = this.currentScene;
+      const spawn =
+        options.spawnPoint ??
+        targetScene.spawnPoint ??
+        new THREE.Vector3(0, 0.5, 2);
+
+      preservedPlayer.object.position.copy(spawn);
+      preservedPlayer.object.rotation.set(0, 0, 0);
+      targetScene.scene.add(preservedPlayer.object);
+      targetScene.setPlayer(preservedPlayer);
+
+      if (this.cameraController) {
+        this.cameraController.followTarget(preservedPlayer.object, {
+          offset: new THREE.Vector3(0, 2.4, 5),
+          lookAtOffset: new THREE.Vector3(0, 1.2, 0),
+        });
+      }
+
+      targetScene.bindSystems(this.animationSystem, this.effectsManager);
+    }
+
+    this.interactionSystem?.rebuildTargets();
+    return /** @type {import('../scenes/SceneBase.js').SceneBase} */ (this.currentScene);
+  }
+
+  /**
+   * @param {{ skipOnExit?: boolean }} [options]
+   */
   unloadCurrentScene(options = {}) {
     if (!this.currentScene) return;
 

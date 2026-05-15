@@ -155,6 +155,12 @@ export class InteractionSystem {
       }
     }
 
+    for (const portal of scene.portalManager?.getPortals() ?? []) {
+      if (portal._interactive) {
+        add(portal._interactive);
+      }
+    }
+
     scene.scene?.traverse((child) => {
       const interactive = child.userData?.interactive;
       if (interactive?.mesh && !seen.has(interactive.id ?? child.uuid)) {

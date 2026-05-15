@@ -7,6 +7,8 @@ import { InteractionSystem } from './core/InteractionSystem.js';
 import { ChamberScene } from './scenes/chamberScene.js';
 import { VoidScene } from './scenes/voidScene.js';
 import { ExampleScene } from './scenes/ExampleScene.js';
+import { CrystalCavernScene } from './scenes/crystalCavernScene.js';
+import { RetroConsoleScene } from './scenes/retroConsoleScene.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 import { modelManager } from './core/ModelManager.js';
 import { SAMPLE_ROBOT_GLB } from './assets/modelUrls.js';
@@ -120,6 +122,8 @@ modelManager.preload([SAMPLE_ROBOT_GLB]).catch(() => {});
 sceneManager.registerScene('chamber', new ChamberScene());
 sceneManager.registerScene('void', new VoidScene());
 sceneManager.registerScene('example', new ExampleScene());
+sceneManager.registerScene('crystal_cave', new CrystalCavernScene());
+sceneManager.registerScene('retro_console', new RetroConsoleScene());
 
 const anchorManager = new AnchorManager({ sceneManager });
 
@@ -154,12 +158,18 @@ function setTraversalInputActive(active) {
  * @param {Parameters<SceneManager['transitionTo']>[1]} [options]
  */
 async function switchScene(id, options) {
+  if (dialogueManager.isActive) return;
   setTraversalInputActive(false);
-  await sceneManager.transitionTo(id, options);
+  await sceneManager.transitionViaPortal(id, {
+    ...options,
+    preservePlayer: sceneManager.currentScene?.player != null,
+    transition: options?.transition ?? 'fade',
+    duration: options?.duration ?? 0.8,
+  });
   interactionSystem.rebuildTargets();
   syncCameraToScene();
   setTraversalInputActive(true);
-  if (sceneManager.currentSceneId === 'example') {
+  if (sceneManager.currentScene?.player) {
     webglRenderer.domElement.requestPointerLock?.();
   }
 }
@@ -183,6 +193,12 @@ inputSystem.on('keyDown', ({ code }) => {
   }
   if (code === 'Digit3') {
     switchScene('example', { transition: 'fade', duration: 0.7 });
+  }
+  if (code === 'Digit4') {
+    switchScene('crystal_cave', { transition: 'warp', duration: 0.85 });
+  }
+  if (code === 'Digit5') {
+    switchScene('retro_console', { transition: 'warp', duration: 0.85 });
   }
   if (code === 'KeyO' && !sceneManager.currentScene?.player) {
     cameraController.toggleMode();

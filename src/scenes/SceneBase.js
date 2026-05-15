@@ -25,6 +25,12 @@ export class SceneBase {
     this.player = null;
     /** @type {import('../npc/NPCManager.js').NPCManager | null} */
     this.npcManager = null;
+    /** @type {import('../portals/PortalManager.js').PortalManager | null} */
+    this.portalManager = null;
+    /** @type {THREE.Vector3} */
+    this.spawnPoint = new THREE.Vector3(0, 0.5, 2);
+    /** @type {import('../core/SceneManager.js').SceneManager | null} */
+    this.sceneManagerRef = null;
     this._built = false;
     this._elapsed = 0;
   }
@@ -74,8 +80,18 @@ export class SceneBase {
    */
   update(deltaTime) {
     this._elapsed += deltaTime;
-    this.player?.update(deltaTime);
-    this.npcManager?.update(deltaTime);
+    if (!this._isDialoguePaused()) {
+      this.player?.update(deltaTime);
+      this.npcManager?.update(deltaTime);
+    }
+    this.portalManager?.update(this._elapsed);
+  }
+
+  /**
+   * @returns {boolean}
+   */
+  _isDialoguePaused() {
+    return this.sceneManagerRef?.dialogueManager?.isActive ?? false;
   }
 
   /**
@@ -97,6 +113,8 @@ export class SceneBase {
 
   dispose() {
     this._disposePlayer();
+    this.portalManager?.dispose();
+    this.portalManager = null;
     this.npcManager?.dispose();
     this.npcManager = null;
     this.shardManager?.clear();
