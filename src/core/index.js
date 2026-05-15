@@ -2,6 +2,7 @@
  * PR4 Animation — centralized update loop and helpers.
  */
 export { AnimationSystem } from './AnimationSystem.js';
+export { CameraController } from './CameraController.js';
 export {
   floatAnimation,
   pulseAnimation,
