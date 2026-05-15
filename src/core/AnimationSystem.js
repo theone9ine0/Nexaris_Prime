@@ -1,3 +1,5 @@
+import { AnimationMixerManager } from './AnimationMixerManager.js';
+
 /**
  * @typedef {{
  *   updateAnimation: (deltaTime: number) => void,
@@ -5,11 +7,15 @@
  */
 
 /**
- * Central PR4 animation subsystem. Updates all registered objects each frame.
+ * Central PR4 animation subsystem. Updates registered objects and PR31 mixers.
  */
 export class AnimationSystem {
-  constructor() {
+  /**
+   * @param {AnimationMixerManager} [mixerManager]
+   */
+  constructor(mixerManager) {
     this.time = 0;
+    this.mixerManager = mixerManager ?? new AnimationMixerManager();
     /** @type {Set<Animatable>} */
     this._objects = new Set();
   }
@@ -47,10 +53,12 @@ export class AnimationSystem {
     for (const object of this._objects) {
       object.updateAnimation(deltaTime);
     }
+    this.mixerManager.update(deltaTime);
   }
 
   clear() {
     this._objects.clear();
+    this.mixerManager.clear();
   }
 
   /**

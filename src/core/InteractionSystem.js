@@ -155,6 +155,14 @@ export class InteractionSystem {
       }
     }
 
+    scene.scene?.traverse((child) => {
+      const interactive = child.userData?.interactive;
+      if (interactive?.mesh && !seen.has(interactive.id ?? child.uuid)) {
+        seen.add(interactive.id ?? child.uuid);
+        list.push(interactive);
+      }
+    });
+
     return list;
   }
 

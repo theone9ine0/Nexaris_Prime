@@ -65,9 +65,17 @@ const interactionSystem = new InteractionSystem({
   getScene: () => sceneManager.currentScene,
 });
 
-interactionSystem.onClick((shard) => {
-  const playing = typeof shard.isPlaying === 'function' ? shard.isPlaying() : null;
-  console.info('[interaction] click', shard.id, shard.metadata, playing != null ? { playing } : {});
+interactionSystem.onClick((target) => {
+  const scene = sceneManager.currentScene;
+  scene?.onInteractClick?.(target);
+
+  const playing = typeof target.isPlaying === 'function' ? target.isPlaying() : null;
+  console.info(
+    '[interaction] click',
+    target.id ?? target.metadata?.title,
+    target.metadata,
+    playing != null ? { playing } : {},
+  );
 });
 
 modelManager.preload([SAMPLE_FOX_GLB]).catch(() => {});
@@ -133,6 +141,9 @@ inputSystem.on('keyDown', ({ code }) => {
   }
   if (code === 'KeyO') {
     cameraController.toggleMode();
+  }
+  if (sceneManager.currentSceneId === 'example') {
+    sceneManager.currentScene?.handleKeyDown?.(code);
   }
   if (code === 'KeyS') {
     anchorManager.save('default', { label: 'Chamber snapshot' });
