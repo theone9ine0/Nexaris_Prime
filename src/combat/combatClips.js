@@ -6,6 +6,10 @@ export const COMBAT_CLIP_PATTERNS = {
   abilityCharge: ['Charge', 'Power', 'Cast', 'emote'],
   hitReact: ['Hit', 'Stagger', 'Hurt', 'Damage', 'emote'],
   block: ['Block', 'Guard', 'idle'],
+  charge: ['Charge', 'PowerUp', 'Cast', 'emote'],
+  transform: ['Transform', 'Power', 'emote', 'Jump'],
+  poweredIdle: ['Idle', 'Power', 'idle'],
+  poweredMove: ['Run', 'Walk', 'run'],
 };
 
 /**

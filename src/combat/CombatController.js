@@ -63,6 +63,15 @@ export class CombatController {
     this.health = this.maxHealth;
     this.energy = 100;
     this.energyRegen = 12;
+    this._baseEnergyRegen = 12;
+
+    /** @type {import('./Transformations.js').TransformationDef | null} */
+    this._transformationDef = null;
+    this._damageMult = 1;
+    this._dashDistMult = 1;
+    this._knockbackMult = 1;
+    /** @type {Set<string>} */
+    this._unlockedAbilities = new Set(['energyBurst', 'aerialDash']);
 
     this.comboIndex = 0;
     this.comboTimer = 0;
@@ -136,6 +145,62 @@ export class CombatController {
     return true;
   }
 
+  /**
+   * @param {import('./Transformations.js').TransformationDef} def
+   */
+  applyTransformationModifiers(def) {
+    this._transformationDef = def;
+    this._damageMult = def.damageMult;
+    this._dashDistMult = def.dashDistMult;
+    this._knockbackMult = def.knockbackMult;
+    this.energyRegen = this._baseEnergyRegen * def.energyRegenMult;
+    for (const id of def.unlockAbilities) {
+      this._unlockedAbilities.add(id);
+    }
+    this.addEnergy(25);
+    this._emitHud();
+  }
+
+  clearTransformationModifiers() {
+    this._transformationDef = null;
+    this._damageMult = 1;
+    this._dashDistMult = 1;
+    this._knockbackMult = 1;
+    this.energyRegen = this._baseEnergyRegen;
+    this._emitHud();
+  }
+
+  /**
+   * @returns {number}
+   */
+  _getEnergyRegen() {
+    return this.energyRegen;
+  }
+
+  /**
+   * @param {number} base
+   * @returns {number}
+   */
+  _scaleDamage(base) {
+    return base * this._damageMult;
+  }
+
+  /**
+   * @param {number} base
+   * @returns {number}
+   */
+  _scaleKnockback(base) {
+    return base * this._knockbackMult;
+  }
+
+  /**
+   * @param {string} abilityId
+   * @returns {boolean}
+   */
+  _canUseAbility(abilityId) {
+    return this._unlockedAbilities.has(abilityId);
+  }
+
   attackLight() {
     if (this.isBusy || this._staggerTimer > 0) return false;
     if (this._tryComboFinisher()) return true;
@@ -189,6 +254,7 @@ export class CombatController {
   useAbility(name) {
     const def = getAbility(name);
     if (!def || this.isBusy || this._staggerTimer > 0) return false;
+    if (!this._canUseAbility(def.id)) return false;
     if (this._cooldowns[def.id] > 0) return false;
     if (!this.consumeEnergy(def.energyCost)) return false;
 
@@ -230,7 +296,7 @@ export class CombatController {
     }
 
     if (this.energy < 100 && this._state === 'idle') {
-      this.energy = Math.min(100, this.energy + this.energyRegen * dt);
+      this.energy = Math.min(100, this.energy + this._getEnergyRegen() * dt);
       this._emitHud();
     }
 
@@ -498,8 +564,8 @@ export class CombatController {
     this._attackType = type;
     this._attackElapsed = 0;
     this._attackDuration = spec.duration;
-    this.hitbox.damage = spec.damage;
-    this.hitbox.knockback = spec.knockback;
+    this.hitbox.damage = this._scaleDamage(spec.damage);
+    this.hitbox.knockback = this._scaleKnockback(spec.knockback);
     this._currentHitWindow = { start: 0.25, end: 0.7 };
 
     const clip = type === 'heavy' ? this.clips.heavy : this.clips.light;
@@ -516,14 +582,14 @@ export class CombatController {
     this._attackType = 'dashAttack';
     this._attackElapsed = 0;
     this._attackDuration = 0.35;
-    this.hitbox.damage = 9;
-    this.hitbox.knockback = 3;
+    this.hitbox.damage = this._scaleDamage(9);
+    this.hitbox.knockback = this._scaleKnockback(3);
     this._currentHitWindow = { start: 0.2, end: 0.75 };
 
     this.object.getWorldDirection(_forward);
     _forward.y = 0;
     _forward.normalize();
-    this._dashVelocity.copy(_forward).multiplyScalar(12);
+    this._dashVelocity.copy(_forward).multiplyScalar(12 * this._dashDistMult);
 
     this._playCombatClip(this.clips.dash);
     this.particles?.spawnDashTrail(this.object);
@@ -541,8 +607,8 @@ export class CombatController {
     this._attackType = 'energyBurst';
     this._attackElapsed = 0;
     this._attackDuration = def.duration;
-    this.hitbox.damage = def.damage ?? 18;
-    this.hitbox.knockback = def.knockback ?? 6;
+    this.hitbox.damage = this._scaleDamage(def.damage ?? 18);
+    this.hitbox.knockback = this._scaleKnockback(def.knockback ?? 6);
     this.hitbox.radius = def.radius ?? 3;
     this._currentHitWindow = def.hitWindow ?? { start: 0.25, end: 0.5 };
 
@@ -565,14 +631,15 @@ export class CombatController {
     this._attackType = 'aerialDash';
     this._attackElapsed = 0;
     this._attackDuration = def.duration;
-    this.hitbox.damage = def.damage ?? 6;
-    this.hitbox.knockback = def.knockback ?? 2;
+    this.hitbox.damage = this._scaleDamage(def.damage ?? 6);
+    this.hitbox.knockback = this._scaleKnockback(def.knockback ?? 2);
     this._currentHitWindow = def.hitWindow ?? { start: 0.1, end: 0.85 };
 
     this.object.getWorldDirection(_forward);
     _forward.y = 0;
     _forward.normalize();
-    this._dashVelocity.copy(_forward).multiplyScalar((def.dashDistance ?? 5) / def.duration);
+    const dist = (def.dashDistance ?? 5) * this._dashDistMult;
+    this._dashVelocity.copy(_forward).multiplyScalar(dist / def.duration);
 
     this._playCombatClip(this.clips.dash);
     this.particles?.spawnDashTrail(this.object, def.duration);
@@ -615,6 +682,7 @@ export class CombatController {
       comboIndex: this.comboIndex,
       comboTimer: this.comboTimer,
       cooldowns: { ...this._cooldowns },
+      transformation: this._transformationDef?.label ?? null,
     });
   }
 

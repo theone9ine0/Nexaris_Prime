@@ -78,6 +78,7 @@ export class CameraController {
     this._modeBlend = 1;
     this._blendFromPos = new THREE.Vector3();
     this._blendFromQuat = new THREE.Quaternion();
+    this._shakeIntensity = 0;
     this._blendToPos = new THREE.Vector3();
     this._blendToQuat = new THREE.Quaternion();
 
@@ -222,6 +223,14 @@ export class CameraController {
   }
 
   /**
+   * Light screen shake for charge / transformation moments (PR39).
+   * @param {number} intensity
+   */
+  addScreenShake(intensity) {
+    this._shakeIntensity = Math.max(this._shakeIntensity, intensity);
+  }
+
+  /**
    * @param {number} deltaTime
    */
   update(deltaTime) {
@@ -242,6 +251,13 @@ export class CameraController {
       this._updateFreeFly(dt);
     } else {
       this._updateOrbit(dt);
+    }
+
+    if (this._shakeIntensity > 0.001) {
+      this.camera.position.x += (Math.random() - 0.5) * this._shakeIntensity;
+      this.camera.position.y += (Math.random() - 0.5) * this._shakeIntensity * 0.6;
+      this.camera.position.z += (Math.random() - 0.5) * this._shakeIntensity;
+      this._shakeIntensity *= 0.88;
     }
   }
 

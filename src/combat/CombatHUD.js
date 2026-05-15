@@ -30,11 +30,22 @@ export class CombatHUD {
     this.abilitiesEl.append(this.abilityQ.root, this.abilityE.root);
     this.hintsEl = document.createElement('div');
     this.hintsEl.className = 'combat-hints';
+    this.chargeTrack = document.createElement('div');
+    this.chargeTrack.className = 'combat-charge-track hidden';
+    this.chargeFill = document.createElement('div');
+    this.chargeFill.className = 'combat-charge-fill';
+    this.chargeTrack.appendChild(this.chargeFill);
+
+    this.transformEl = document.createElement('div');
+    this.transformEl.className = 'combat-transform-label hidden';
+
     this.hintsEl.innerHTML =
-      'LMB Light · RMB Heavy · Space Dash · Q Burst · E Aerial Dash';
+      'LMB Light · RMB Heavy · Space Dash · Q Burst · E Aerial Dash · Hold F Charge';
 
     this.root.append(
       this.energyTrack,
+      this.chargeTrack,
+      this.transformEl,
       this.comboEl,
       this.abilitiesEl,
       this.hintsEl,
@@ -79,11 +90,32 @@ export class CombatHUD {
    *   comboIndex?: number,
    *   comboTimer?: number,
    *   cooldowns?: { energyBurst?: number, aerialDash?: number },
+   *   chargeLevel?: number,
+   *   charging?: boolean,
+   *   transformation?: string | null,
    * }} state
    */
   update(state) {
     const energy = state.energy ?? 0;
     this.energyFill.style.width = `${energy}%`;
+
+    const charging = state.charging ?? false;
+    const chargeLevel = state.chargeLevel ?? 0;
+    if (charging) {
+      this.chargeTrack.classList.remove('hidden');
+      this.chargeFill.style.width = `${chargeLevel * 100}%`;
+    } else {
+      this.chargeTrack.classList.add('hidden');
+    }
+
+    const transform = state.transformation;
+    if (transform) {
+      this.transformEl.classList.remove('hidden');
+      const label = transform.replace(/Mode$/, '').toUpperCase();
+      this.transformEl.textContent = `${label} ACTIVE`;
+    } else {
+      this.transformEl.classList.add('hidden');
+    }
 
     const combo = state.comboIndex ?? 0;
     const timer = state.comboTimer ?? 0;

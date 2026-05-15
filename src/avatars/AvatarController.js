@@ -100,6 +100,8 @@ export class AvatarController {
     this.combatMode = false;
     /** @type {import('../combat/CombatController.js').CombatController | null} */
     this.combatController = null;
+    /** @type {import('../combat/AuraController.js').AuraController | null} */
+    this.auraController = null;
 
     this._forward = new THREE.Vector3();
     this._right = new THREE.Vector3();
@@ -226,8 +228,11 @@ export class AvatarController {
   update(deltaTime) {
     const dt = Math.min(deltaTime, 0.05);
     if (this.dialoguePaused || this.combatPaused) {
+      this.auraController?.update(deltaTime);
       return;
     }
+
+    this.auraController?.update(deltaTime);
     this._updateMovement(dt);
     this._updateLocomotionAnimation();
     this._updateVRMFollowCamera();
@@ -377,6 +382,8 @@ export class AvatarController {
   }
 
   dispose() {
+    this.auraController?.dispose();
+    this.auraController = null;
     if (this.vrmAvatar && this._animationSystem) {
       this._animationSystem.unregisterVRMAvatar(this.vrmAvatar);
     }

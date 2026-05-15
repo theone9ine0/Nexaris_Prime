@@ -105,6 +105,8 @@ export class NPC {
     this._lookPhase = Math.random() * Math.PI * 2;
     this._arriveThreshold = 0.35;
     this.combatPaused = false;
+    /** @type {import('../combat/AuraController.js').AuraController | null} */
+    this.auraController = null;
 
     const animations = options.animations ?? [];
     const clipNames = animations.map((c) => c.name);
@@ -340,8 +342,11 @@ export class NPC {
     if (this.combatPaused) {
       this._velocity.lerp(new THREE.Vector3(), 1 - Math.exp(-10 * dt));
       this.object.position.y = this.groundY;
+      this.auraController?.update(deltaTime);
       return;
     }
+
+    this.auraController?.update(deltaTime);
 
     switch (this.state) {
       case 'idle':
@@ -509,6 +514,8 @@ export class NPC {
   }
 
   dispose() {
+    this.auraController?.dispose();
+    this.auraController = null;
     if (this.vrmAvatar && this._animationSystem) {
       this._animationSystem.unregisterVRMAvatar(this.vrmAvatar);
     }

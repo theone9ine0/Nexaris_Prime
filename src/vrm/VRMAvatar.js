@@ -56,6 +56,10 @@ export class VRMAvatar {
 
     this._limitSpringBones();
     this._applyExpressionWeights();
+
+    this._springBoost = 1;
+    this._savedSpringSettings = [];
+    this._transformationExpressionActive = false;
   }
 
   /**
@@ -148,7 +152,78 @@ export class VRMAvatar {
     this.update(deltaTime);
   }
 
+  /**
+   * Boost spring bone motion during transformations (PR39).
+   * @param {number} multiplier
+   */
+  applyTransformationBoost(multiplier = 1.3) {
+    const manager = this.vrm.springBoneManager;
+    if (!manager?.joints?.length) return;
+
+    this._springBoost = multiplier;
+    this._savedSpringSettings = [];
+
+    const limit = Math.min(manager.joints.length, VRM_SPRING_BONE_LIMIT);
+    for (let i = 0; i < limit; i++) {
+      const joint = manager.joints[i];
+      if (!joint?.settings) continue;
+      this._savedSpringSettings.push({
+        stiffness: joint.settings.stiffness,
+        gravityPower: joint.settings.gravityPower,
+      });
+      joint.settings.stiffness *= multiplier;
+      joint.settings.gravityPower *= multiplier * 0.85;
+    }
+  }
+
+  clearTransformationBoost() {
+    const manager = this.vrm.springBoneManager;
+    if (!manager?.joints?.length || !this._savedSpringSettings.length) {
+      this._springBoost = 1;
+      return;
+    }
+
+    const limit = Math.min(manager.joints.length, this._savedSpringSettings.length);
+    for (let i = 0; i < limit; i++) {
+      const joint = manager.joints[i];
+      const saved = this._savedSpringSettings[i];
+      if (!joint?.settings || !saved) continue;
+      joint.settings.stiffness = saved.stiffness;
+      joint.settings.gravityPower = saved.gravityPower;
+    }
+    this._savedSpringSettings = [];
+    this._springBoost = 1;
+  }
+
+  /**
+   * Stylized transformation face / hair offsets via blendshapes.
+   * @param {{ eyeGlow?: number, hairLift?: number, expression?: string }} options
+   */
+  setTransformationExpressions(options = {}) {
+    this._transformationExpressionActive = true;
+    if (options.eyeGlow != null) {
+      this.setExpression('surprised', options.eyeGlow * 0.4);
+      this.setExpression('relaxed', 0);
+    }
+    if (options.hairLift != null) {
+      this.setExpression('happy', options.hairLift * 0.25);
+    }
+    if (options.expression) {
+      this.playExpression(options.expression, 0.8, 'neutral');
+    }
+  }
+
+  clearTransformationExpressions() {
+    if (!this._transformationExpressionActive) return;
+    this._transformationExpressionActive = false;
+    this.setExpression('surprised', 0);
+    this.setExpression('happy', 0);
+    this.setExpression('relaxed', 0);
+  }
+
   dispose() {
+    this.clearTransformationBoost();
+    this.clearTransformationExpressions();
     this._expressionWeights.clear();
     this._expressionFade = null;
     this._expressionPlay = null;

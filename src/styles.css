@@ -225,3 +225,45 @@ body {
   color: rgba(180, 200, 255, 0.45);
   white-space: nowrap;
 }
+
+.combat-charge-track {
+  position: absolute;
+  top: 2.1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(14rem, calc(100% - 3rem));
+  height: 0.45rem;
+  border-radius: 999px;
+  background: rgba(6, 8, 20, 0.9);
+  border: 1px solid rgba(255, 200, 100, 0.45);
+  overflow: hidden;
+}
+
+.combat-charge-track.hidden {
+  display: none;
+}
+
+.combat-charge-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ffaa44, #ffee88, #ffffff);
+  box-shadow: 0 0 14px rgba(255, 220, 100, 0.7);
+  transition: width 0.08s linear;
+}
+
+.combat-transform-label {
+  position: absolute;
+  top: 2.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #ffeeaa;
+  text-shadow: 0 0 12px rgba(255, 180, 80, 0.9);
+}
+
+.combat-transform-label.hidden {
+  display: none;
+}

@@ -7,6 +7,7 @@ import { SAMPLE_ROBOT_GLB } from '../assets/modelUrls.js';
 import { CombatController } from '../combat/CombatController.js';
 import { CombatParticles } from '../combat/particles/CombatParticles.js';
 import { CombatHUD } from '../combat/CombatHUD.js';
+import { AuraController } from '../combat/AuraController.js';
 
 /**
  * PR38 — stylized anime combat training arena.
@@ -31,6 +32,9 @@ export class CombatZoneScene extends SceneBase {
     this.combatParticles = null;
     /** @type {CombatHUD | null} */
     this.combatHud = null;
+    /** @type {AuraController | null} */
+    this.playerAura = null;
+    this._effectsManager = null;
   }
 
   _buildContent() {
@@ -109,6 +113,7 @@ export class CombatZoneScene extends SceneBase {
   bindSystems(animationSystem, effectsManager) {
     super.bindSystems(animationSystem, effectsManager);
     this._animationSystem = animationSystem;
+    this._effectsManager = effectsManager;
 
     if (!this._animationSystem?.mixerManager || this._loading) return;
     if (this.playerCombat) return;
@@ -162,7 +167,20 @@ export class CombatZoneScene extends SceneBase {
         isAI: false,
         isAvatar: true,
         clipNames,
-        onHudUpdate: (state) => this.combatHud?.update(state),
+        onHudUpdate: (state) => this._updateCombatHud(state),
+      });
+
+      this.playerAura = AuraController.attach({
+        host: avatar,
+        scene: this.scene,
+        combatController: this.playerCombat,
+        clips: this.playerCombat.clips,
+        effectsManager: this._effectsManager,
+        combatParticles: this.combatParticles,
+        inputSystem: this.inputSystem,
+        cameraController: this.cameraController,
+        enableChargeInput: true,
+        onEvent: (e) => this._onAuraEvent(e),
       });
 
       this.npcManager = new NPCManager(
@@ -218,8 +236,42 @@ export class CombatZoneScene extends SceneBase {
     }
   }
 
+  /**
+   * @param {object} state
+   */
+  _updateCombatHud(state) {
+    this.combatHud?.update({
+      ...state,
+      chargeLevel: this.playerAura?.chargeLevel ?? 0,
+      charging: this.playerAura?.isCharging ?? false,
+      transformation: this.playerAura?.transformation ?? state.transformation,
+    });
+  }
+
+  /**
+   * @param {{ type: string }} event
+   */
+  _onAuraEvent(event) {
+    if (event.type === 'onTransform' || event.type === 'transformStart') {
+      this.playerAura?.pulseTransformReaction(
+        this.combatants.filter((c) => c.isAI),
+      );
+    }
+    if (event.type === 'onChargeStart' || event.type === 'chargeStart') {
+      console.info('[Aura] Charge started — hold F, release to transform');
+    }
+    if (event.type === 'onChargeComplete' || event.type === 'chargeComplete') {
+      console.info('[Aura] Charge complete!');
+    }
+    if (event.type === 'onAuraPulse') {
+      // placeholder for audio hooks
+    }
+  }
+
   update(deltaTime) {
     super.update(deltaTime);
+
+    this.playerAura?.update(deltaTime);
 
     for (const fighter of this.combatants) {
       fighter.update(deltaTime);
@@ -229,6 +281,8 @@ export class CombatZoneScene extends SceneBase {
   }
 
   _disposeCombat() {
+    this.playerAura?.dispose();
+    this.playerAura = null;
     for (const fighter of [...this.combatants]) {
       fighter.dispose();
     }
