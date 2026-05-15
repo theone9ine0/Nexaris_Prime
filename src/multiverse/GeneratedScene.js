@@ -226,18 +226,8 @@ export class GeneratedScene extends SceneBase {
     }
   }
 
-  update(deltaTime) {
-    super.update(deltaTime);
-    for (const portal of this.portals) {
-      portal.update(this._elapsed);
-    }
-  }
-
   dispose() {
     this._unbindKeyHandler();
-    for (const portal of this.portals) {
-      portal.dispose();
-    }
     this.portals = [];
     super.dispose();
   }

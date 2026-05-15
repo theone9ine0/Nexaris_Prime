@@ -1,8 +1,14 @@
 import * as THREE from 'three';
 import { createPortalSurfaceMaterial } from './PortalShader.js';
+import {
+  isProceduralSceneId,
+  seedFromProceduralSceneId,
+  getMultiverseDepth,
+} from '../multiverse/proceduralSceneId.js';
 
 /**
  * @typedef {import('../core/SceneManager.js').SceneManager} SceneManager
+ * @typedef {'ring' | 'arch' | 'crystal' | 'void' | 'cyber'} PortalFrameStyle
  */
 
 /**
@@ -12,15 +18,19 @@ import { createPortalSurfaceMaterial } from './PortalShader.js';
  *   targetSceneId?: string | null,
  *   targetSeed?: number,
  *   color?: number,
+ *   colorOuter?: number,
  *   radius?: number,
- *   frameStyle?: 'ring' | 'arch',
+ *   frameStyle?: PortalFrameStyle,
+ *   visualTheme?: string,
+ *   shaderVariant?: number,
+ *   isProcedural?: boolean,
  *   sceneManager?: SceneManager | null,
  *   onActivate?: (portal: Portal) => void,
  * }} PortalOptions
  */
 
 /**
- * PR14 — clickable dimensional portal with shader surface and scene transitions.
+ * PR14 / PR14.5 — dimensional portal with themed shader surface and scene transitions.
  */
 export class Portal extends THREE.Group {
   /**
@@ -31,11 +41,16 @@ export class Portal extends THREE.Group {
     this.id = options.id;
     this.name = `portal_${this.id}`;
     this.targetSceneId = options.targetSceneId ?? null;
-    this.targetSeed = options.targetSeed;
+    this.targetSeed =
+      options.targetSeed ??
+      (this.targetSceneId ? seedFromProceduralSceneId(this.targetSceneId) : undefined);
     this.sceneManager = options.sceneManager ?? null;
     this.onActivate = options.onActivate ?? null;
+    this.isProcedural = options.isProcedural ?? isProceduralSceneId(this.targetSceneId);
+    this.visualTheme = options.visualTheme ?? null;
 
     const color = options.color ?? 0x66ccff;
+    const colorOuter = options.colorOuter ?? color;
     const radius = options.radius ?? 0.9;
     this._radius = radius;
     this._baseEmissive = 0.55;
@@ -44,14 +59,16 @@ export class Portal extends THREE.Group {
     this._open = 1;
     this._anim = null;
 
-    this.portalMesh = this._createFrame(options.frameStyle ?? 'ring', radius, color);
+    const frameStyle = options.frameStyle ?? 'ring';
+    this.portalMesh = this._createFrame(frameStyle, radius, color);
     this.add(this.portalMesh);
 
     this.portalSurface = new THREE.Mesh(
       new THREE.CircleGeometry(radius * 0.78, 32),
       createPortalSurfaceMaterial({
         colorInner: color,
-        colorOuter: color,
+        colorOuter,
+        shaderVariant: options.shaderVariant ?? 0,
       }),
     );
     this.portalSurface.rotation.x = Math.PI / 2;
@@ -68,49 +85,150 @@ export class Portal extends THREE.Group {
   }
 
   /**
-   * @param {'ring' | 'arch'} style
+   * @param {PortalFrameStyle} style
    * @param {number} radius
    * @param {number} color
    * @returns {THREE.Object3D}
    */
   _createFrame(style, radius, color) {
-    const frameMat = new THREE.MeshStandardMaterial({
+    if (style === 'crystal') {
+      return this._createCrystalFrame(radius, color);
+    }
+    if (style === 'void') {
+      return this._createVoidFrame(radius, color);
+    }
+    if (style === 'cyber') {
+      return this._createCyberFrame(radius, color);
+    }
+    if (style === 'arch') {
+      return this._createArchFrame(radius, color);
+    }
+    return this._createRingFrame(radius, color);
+  }
+
+  /**
+   * @param {number} radius
+   * @param {number} color
+   */
+  _createFrameMaterial(radius, color) {
+    return new THREE.MeshStandardMaterial({
       color,
       emissive: color,
       emissiveIntensity: this._baseEmissive,
       metalness: 0.75,
       roughness: 0.2,
     });
+  }
 
-    if (style === 'arch') {
-      const group = new THREE.Group();
-      const torus = new THREE.Mesh(
-        new THREE.TorusGeometry(radius, 0.07, 10, 32, Math.PI),
-        frameMat,
-      );
-      torus.rotation.x = Math.PI / 2;
-      torus.rotation.z = Math.PI;
-      group.add(torus);
-      const base = new THREE.Mesh(
-        new THREE.BoxGeometry(radius * 1.6, 0.12, 0.12),
-        frameMat,
-      );
-      base.position.y = -0.05;
-      group.add(base);
-      return group;
-    }
-
+  /**
+   * @param {number} radius
+   * @param {number} color
+   */
+  _createRingFrame(radius, color) {
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(radius, 0.08, 12, 36),
-      frameMat,
+      this._createFrameMaterial(radius, color),
     );
     ring.rotation.x = Math.PI / 2;
     return ring;
   }
 
   /**
+   * @param {number} radius
    * @param {number} color
    */
+  _createArchFrame(radius, color) {
+    const frameMat = this._createFrameMaterial(radius, color);
+    const group = new THREE.Group();
+    const torus = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, 0.07, 10, 32, Math.PI),
+      frameMat,
+    );
+    torus.rotation.x = Math.PI / 2;
+    torus.rotation.z = Math.PI;
+    group.add(torus);
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(radius * 1.6, 0.12, 0.12),
+      frameMat,
+    );
+    base.position.y = -0.05;
+    group.add(base);
+    return group;
+  }
+
+  /**
+   * @param {number} radius
+   * @param {number} color
+   */
+  _createCrystalFrame(radius, color) {
+    const group = new THREE.Group();
+    const mat = this._createFrameMaterial(radius, color);
+    mat.metalness = 0.9;
+    mat.roughness = 0.1;
+    for (let i = 0; i < 6; i++) {
+      const shard = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.12, 0),
+        mat,
+      );
+      const angle = (i / 6) * Math.PI * 2;
+      shard.position.set(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.15, Math.sin(angle) * radius);
+      shard.rotation.set(angle, angle * 0.5, 0);
+      group.add(shard);
+    }
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, 0.05, 8, 24),
+      mat,
+    );
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+    return group;
+  }
+
+  /**
+   * @param {number} radius
+   * @param {number} color
+   */
+  _createVoidFrame(radius, color) {
+    const dark = new THREE.MeshStandardMaterial({
+      color: 0x050508,
+      emissive: color,
+      emissiveIntensity: 0.35,
+      metalness: 0.95,
+      roughness: 0.05,
+    });
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, 0.06, 12, 36),
+      dark,
+    );
+    ring.rotation.x = Math.PI / 2;
+    return ring;
+  }
+
+  /**
+   * @param {number} radius
+   * @param {number} color
+   */
+  _createCyberFrame(radius, color) {
+    const group = new THREE.Group();
+    const mat = this._createFrameMaterial(radius, color);
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius, 0.07, 12, 32),
+      mat,
+    );
+    ring.rotation.x = Math.PI / 2;
+    group.add(ring);
+    for (let i = 0; i < 4; i++) {
+      const box = new THREE.Mesh(
+        new THREE.BoxGeometry(0.15, 0.15, 0.15),
+        mat,
+      );
+      const angle = (i / 4) * Math.PI * 2;
+      box.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+      group.add(box);
+    }
+    return group;
+  }
+
   _bindInteraction(color) {
     const hitMesh = this.portalSurface;
     const self = this;
@@ -119,11 +237,12 @@ export class Portal extends THREE.Group {
       id: this.id,
       mesh: hitMesh,
       metadata: {
-        title: 'Portal',
+        title: this.isProcedural ? 'Procedural Portal' : 'Portal',
         type: 'portal',
         payload: {
           targetSceneId: this.targetSceneId,
           targetSeed: this.targetSeed,
+          procedural: this.isProcedural,
         },
       },
       onHoverEnter() {
@@ -137,18 +256,8 @@ export class Portal extends THREE.Group {
       },
     };
     hitMesh.userData.interactive = this._interactive;
-
-    this.traverse((child) => {
-      if (child.isMesh && child !== hitMesh) {
-        child.userData.portalFrame = true;
-      }
-    });
   }
 
-  /**
-   * @param {number} frameIntensity
-   * @param {number} surfaceGlow
-   */
   _setGlow(frameIntensity, surfaceGlow) {
     this.portalMesh.traverse((child) => {
       if (child.isMesh && child.material?.emissiveIntensity != null) {
@@ -161,13 +270,13 @@ export class Portal extends THREE.Group {
     }
   }
 
-  /**
-   * @param {string} sceneId
-   */
   setTargetScene(sceneId) {
     this.targetSceneId = sceneId;
+    this.isProcedural = isProceduralSceneId(sceneId);
+    this.targetSeed = seedFromProceduralSceneId(sceneId) ?? this.targetSeed;
     if (this._interactive?.metadata?.payload) {
       this._interactive.metadata.payload.targetSceneId = sceneId;
+      this._interactive.metadata.payload.procedural = this.isProcedural;
     }
   }
 
@@ -179,10 +288,6 @@ export class Portal extends THREE.Group {
     return this._animateOpen(0, duration);
   }
 
-  /**
-   * @param {number} target
-   * @param {number} duration
-   */
   _animateOpen(target, duration) {
     if (this._anim) {
       cancelAnimationFrame(this._anim);
@@ -219,10 +324,14 @@ export class Portal extends THREE.Group {
     await this.playCloseAnimation(0.25);
 
     if (this.targetSceneId && this.sceneManager) {
+      const depth = getMultiverseDepth(this.sceneManager.currentScene);
       await this.sceneManager.transitionViaPortal(this.targetSceneId, {
         preservePlayer: true,
         transition: 'warp',
         duration: 0.85,
+        targetSeed: this.targetSeed,
+        depth,
+        isProcedural: this.isProcedural,
       });
       await this.playOpenAnimation(0.35);
       return;
@@ -236,9 +345,6 @@ export class Portal extends THREE.Group {
     parent.add(this);
   }
 
-  /**
-   * @param {number} elapsed
-   */
   update(elapsed) {
     this._phase += 0.02;
     const mat = this.portalSurface.material;
@@ -259,7 +365,9 @@ export class Portal extends THREE.Group {
     this.portalMesh.traverse((child) => {
       if (child.isMesh) {
         child.geometry?.dispose();
-        child.material?.dispose();
+        if (child.material && !Array.isArray(child.material)) {
+          child.material.dispose();
+        }
       }
     });
     delete this.portalSurface.userData.interactive;

@@ -4,6 +4,12 @@ import { EffectsManager } from '../effects/index.js';
 import { AnimationSystem } from './AnimationSystem.js';
 import { modelManager } from './ModelManager.js';
 import { MultiverseGenerator } from '../multiverse/MultiverseGenerator.js';
+import {
+  isProceduralSceneId,
+  seedFromProceduralSceneId,
+  getMultiverseDepth,
+  MAX_MULTIVERSE_DEPTH,
+} from '../multiverse/proceduralSceneId.js';
 
 /**
  * @typedef {'fade' | 'warp'} TransitionType
@@ -200,9 +206,11 @@ export class SceneManager {
       this.currentScene.setPlayer(null);
     }
 
+    const parentDepth = getMultiverseDepth(this.currentScene);
     const result = this.multiverseGenerator.generate(seed ?? Date.now());
     result.scene.setPreservedPlayer(preservedPlayer);
     result.scene.sceneManagerRef = this;
+    result.scene.scene.userData.multiverseDepth = parentDepth + 1;
 
     this.registerScene(result.id, result.scene);
 
@@ -231,6 +239,42 @@ export class SceneManager {
   }
 
   /**
+   * Load a registered scene or generate a procedural dimension on demand (PR14.5).
+   * @param {string} sceneId
+   * @param {{ depth?: number, targetSeed?: number }} [options]
+   * @returns {import('../scenes/SceneBase.js').SceneBase | null}
+   */
+  loadOrGenerateScene(sceneId, options = {}) {
+    const existing = this._registry.get(sceneId);
+    if (existing) {
+      return existing;
+    }
+
+    if (!isProceduralSceneId(sceneId)) {
+      return null;
+    }
+
+    const seed = options.targetSeed ?? seedFromProceduralSceneId(sceneId);
+    if (seed == null) {
+      return null;
+    }
+
+    const depth = options.depth ?? getMultiverseDepth(this.currentScene);
+    if (depth >= MAX_MULTIVERSE_DEPTH) {
+      console.warn(
+        `[SceneManager] Multiverse depth limit (${MAX_MULTIVERSE_DEPTH}) reached`,
+      );
+      return null;
+    }
+
+    const result = this.multiverseGenerator.generate(seed);
+    result.scene.scene.userData.multiverseDepth = depth + 1;
+    result.scene.sceneManagerRef = this;
+    this.registerScene(result.id, result.scene);
+    return result.scene;
+  }
+
+  /**
    * Transition to a scene via portal — preserves player and spawns at target spawn point.
    * @param {string} targetSceneId
    * @param {{
@@ -238,14 +282,35 @@ export class SceneManager {
    *   transition?: TransitionType,
    *   duration?: number,
    *   spawnPoint?: THREE.Vector3,
+   *   targetSeed?: number,
+   *   depth?: number,
+   *   isProcedural?: boolean,
    * }} [options]
    */
   async transitionViaPortal(targetSceneId, options = {}) {
-    if (!this._registry.has(targetSceneId)) {
-      throw new Error(`Scene not registered: ${targetSceneId}`);
-    }
     if (this.isTransitioning()) {
       return this.currentScene;
+    }
+
+    const isProcedural = options.isProcedural ?? isProceduralSceneId(targetSceneId);
+    const depth = options.depth ?? getMultiverseDepth(this.currentScene);
+
+    if (isProcedural && depth >= MAX_MULTIVERSE_DEPTH) {
+      console.warn(`[SceneManager] Cannot traverse deeper (depth ${depth})`);
+      return this.currentScene;
+    }
+
+    if (!this._registry.has(targetSceneId)) {
+      const loaded = this.loadOrGenerateScene(targetSceneId, {
+        depth,
+        targetSeed: options.targetSeed,
+      });
+      if (!loaded && !isProceduralSceneId(targetSceneId)) {
+        throw new Error(`Scene not registered: ${targetSceneId}`);
+      }
+      if (!loaded) {
+        return this.currentScene;
+      }
     }
 
     /** @type {import('../avatars/AvatarController.js').AvatarController | null} */

@@ -3,7 +3,9 @@ import { SeededRandom } from './SeededRandom.js';
 import { initNoise, fbm2D } from './noise.js';
 import { DIMENSION_TEMPLATES } from './templates/index.js';
 import { GeneratedScene } from './GeneratedScene.js';
-import { Portal } from '../portals/Portal.js';
+import { PortalManager } from '../portals/PortalManager.js';
+import { getPortalThemeForDimension } from '../portals/portalThemes.js';
+import { proceduralSceneIdFromSeed } from './proceduralSceneId.js';
 
 const WORLD_SIZE = 22;
 const TERRAIN_SEGMENTS = 24;
@@ -48,7 +50,7 @@ export class MultiverseGenerator {
     initNoise(resolvedSeed);
 
     const template = rng.pick(DIMENSION_TEMPLATES);
-    const id = `multiverse_${resolvedSeed}_${this._counter++}`;
+    const id = proceduralSceneIdFromSeed(resolvedSeed);
 
     const terrainRoot = new THREE.Group();
     terrainRoot.name = 'terrain';
@@ -69,11 +71,16 @@ export class MultiverseGenerator {
     scene.build();
     this.generateShards(scene, rng, template);
     this.generateNPCs(scene, rng, template);
-    const portals = this.generatePortals(scene, rng, template, resolvedSeed);
+
+    scene.portalManager = new PortalManager(scene.scene, this.sceneManager);
+    const portals = this.generatePortals(
+      scene,
+      rng,
+      template,
+      resolvedSeed,
+      scene.portalManager,
+    );
     scene.portals = portals;
-    for (const portal of portals) {
-      portal.addTo(scene.scene);
-    }
 
     const elapsed = performance.now() - t0;
     if (elapsed > 200) {
@@ -421,39 +428,50 @@ export class MultiverseGenerator {
    * @param {SeededRandom} rng
    * @param {DimensionTemplate} template
    * @param {number} parentSeed
-   * @returns {Portal[]}
+   * @param {PortalManager} [portalManager]
+   * @returns {import('../portals/Portal.js').Portal[]}
    */
-  generatePortals(scene, rng, template, parentSeed) {
+  generatePortals(scene, rng, template, parentSeed, portalManager) {
     const count = rng.int(template.portalCount[0], template.portalCount[1]);
-    /** @type {Portal[]} */
+    const theme = getPortalThemeForDimension(template.id);
+    const manager =
+      portalManager ??
+      scene.portalManager ??
+      new PortalManager(scene.scene, this.sceneManager);
+
+    /** @type {import('../portals/Portal.js').Portal[]} */
     const portals = [];
+
+    const frameStyles = ['ring', 'arch', 'crystal', 'void', 'cyber'];
 
     for (let i = 0; i < count; i++) {
       const angle = (i / count) * Math.PI * 2 + rng.range(0.2, 0.8);
       const dist = rng.range(5, 9);
       const targetSeed = ((parentSeed + i * 2654435761) ^ 0x9e3779b9) >>> 0;
+      const targetSceneId = proceduralSceneIdFromSeed(targetSeed);
+      const radius = rng.range(0.75, 1.15) * theme.radiusScale;
+      const accentTint = template.palette.accent ^ (i * 0x111111);
 
-      const portal = new Portal({
+      const portal = manager.createProceduralPortal({
         id: `${scene.id}_portal_${i}`,
         position: new THREE.Vector3(
           Math.cos(angle) * dist,
-          rng.range(0.8, 2),
+          rng.range(0.8, 2.2),
           Math.sin(angle) * dist,
         ),
+        targetSceneId,
         targetSeed,
-        color: template.palette.accent,
-        sceneManager: this.sceneManager,
-        onActivate: (p) => {
-          if (!this.sceneManager || p.targetSeed == null) return;
-          this.sceneManager.generateAndLoad(p.targetSeed, {
-            preservePlayer: true,
-            parentSeed,
-            transition: 'warp',
-            duration: 0.85,
-          });
-        },
+        radius,
+        color: accentTint,
+        colorOuter: theme.colorOuter,
+        visualTheme: template.id,
+        frameStyle: rng.pick(frameStyles),
       });
       portals.push(portal);
+    }
+
+    if (!scene.portalManager) {
+      scene.portalManager = manager;
     }
 
     return portals;
