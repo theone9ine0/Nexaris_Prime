@@ -3,6 +3,7 @@
  */
 export { AnimationSystem } from './AnimationSystem.js';
 export { CameraController } from './CameraController.js';
+export { InputSystem } from './InputSystem.js';
 export {
   floatAnimation,
   pulseAnimation,

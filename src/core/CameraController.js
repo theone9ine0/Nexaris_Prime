@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { InputSystem } from './InputSystem.js';
 
 /**
  * @typedef {'freefly' | 'orbit'} CameraMode
@@ -8,7 +9,7 @@ import * as THREE from 'three';
  * @typedef {{
  *   camera: THREE.PerspectiveCamera,
  *   domElement: HTMLElement,
- *   inputSystem?: InputSystemLike | null,
+ *   inputSystem: InputSystem,
  *   mode?: CameraMode,
  *   moveSpeed?: number,
  *   lookSpeed?: number,
@@ -19,15 +20,6 @@ import * as THREE from 'three';
  * }} CameraControllerOptions
  */
 
-/**
- * Minimal InputSystem surface (PR11) — optional injection.
- * @typedef {{
- *   on: (event: string, handler: (e: Event) => void) => void,
- *   off: (event: string, handler: (e: Event) => void) => void,
- *   isKeyDown?: (code: string) => boolean,
- * }} InputSystemLike
- */
-
 const MODE_FREEFLY = 'freefly';
 const MODE_ORBIT = 'orbit';
 
@@ -36,15 +28,20 @@ const EPS = 1e-6;
 
 /**
  * PR10 — keyboard + mouse camera traversal (FreeFly and Orbit).
+ * Consumes PR11 InputSystem for all keyboard/mouse state.
  */
 export class CameraController {
   /**
    * @param {CameraControllerOptions} options
    */
   constructor(options) {
+    if (!options.inputSystem) {
+      throw new Error('CameraController requires an InputSystem instance');
+    }
+
     this.camera = options.camera;
     this.domElement = options.domElement;
-    this.inputSystem = options.inputSystem ?? null;
+    this.inputSystem = options.inputSystem;
 
     /** @type {CameraMode} */
     this.mode = options.mode ?? MODE_FREEFLY;
@@ -63,16 +60,10 @@ export class CameraController {
     this._velocity = new THREE.Vector3();
     this._moveInput = new THREE.Vector3();
     this._euler = new THREE.Euler(0, 0, 0, 'YXZ');
-    this._keys = new Set();
-    this._pointerLocked = false;
-    this._lookDelta = { x: 0, y: 0 };
 
     this._orbitRadius = 4;
     this._orbitTheta = 0;
     this._orbitPhi = PI_2 * 0.5;
-    this._orbitDragging = false;
-    this._orbitPanning = false;
-    this._lastPointer = { x: 0, y: 0 };
 
     this._modeBlend = 1;
     this._blendFromPos = new THREE.Vector3();
@@ -84,12 +75,31 @@ export class CameraController {
     this._scratchV3b = new THREE.Vector3();
     this._scratchQuat = new THREE.Quaternion();
 
-    /** @type {Map<string, (e: Event) => void>} */
-    this._handlers = new Map();
-    this._useInternalInput = !this.inputSystem;
+    /** @type {(payload: import('./InputSystem.js').MouseButtonPayload) => void} */
+    this._handleMouseDown = (payload) => this._onInputMouseDown(payload);
+    this._handlePointerLockChange = () => this._onPointerLockChange();
 
-    if (this._useInternalInput) {
-      this._attachInternalInput();
+    this.inputSystem.on('mouseDown', this._handleMouseDown);
+    document.addEventListener('pointerlockchange', this._handlePointerLockChange);
+  }
+
+  /**
+   * @param {import('./InputSystem.js').MouseButtonPayload} payload
+   */
+  _onInputMouseDown(payload) {
+    if (!this._inputActive || !this.enabled) return;
+    if (payload.event.target !== this.domElement && !this.domElement.contains(payload.event.target)) {
+      return;
+    }
+
+    if (this.mode === MODE_FREEFLY && payload.button === 0) {
+      this.domElement.requestPointerLock?.();
+    }
+  }
+
+  _onPointerLockChange() {
+    if (document.pointerLockElement !== this.domElement && this.mode === MODE_FREEFLY) {
+      // pointer released — deltas stop via InputSystem
     }
   }
 
@@ -100,11 +110,7 @@ export class CameraController {
   setInputActive(active) {
     this._inputActive = active;
     if (!active) {
-      this._keys.clear();
-      this._lookDelta.x = 0;
-      this._lookDelta.y = 0;
-      this._orbitDragging = false;
-      this._orbitPanning = false;
+      this.inputSystem.clearFrameState();
       this._velocity.set(0, 0, 0);
     }
   }
@@ -117,6 +123,10 @@ export class CameraController {
       throw new Error(`Unknown camera mode: ${mode}`);
     }
     if (mode === this.mode && this._modeBlend >= 1) return;
+
+    if (document.pointerLockElement === this.domElement) {
+      document.exitPointerLock?.();
+    }
 
     this._syncStateFromCamera();
 
@@ -150,15 +160,11 @@ export class CameraController {
     }
   }
 
-  /**
-   * Read camera transform into internal freefly / orbit state.
-   */
   syncFromCamera() {
     this._syncStateFromCamera();
   }
 
   /**
-   * Apply a scene's default camera pose (e.g. after SceneManager activation).
    * @param {THREE.Vector3} position
    * @param {THREE.Vector3} [lookAt]
    */
@@ -182,9 +188,7 @@ export class CameraController {
       return;
     }
 
-    if (!this._inputActive) {
-      return;
-    }
+    if (!this._inputActive) return;
 
     if (this.mode === MODE_FREEFLY) {
       this._updateFreeFly(dt);
@@ -214,6 +218,7 @@ export class CameraController {
   _updateFreeFly(dt) {
     this._applyLookFreeFly();
 
+    const input = this.inputSystem;
     const forward = this._scratchV3a;
     const right = this._scratchV3b;
     this.camera.getWorldDirection(forward);
@@ -226,12 +231,12 @@ export class CameraController {
     right.crossVectors(forward, this.camera.up).normalize();
 
     this._moveInput.set(0, 0, 0);
-    if (this._keys.has('KeyW')) this._moveInput.add(forward);
-    if (this._keys.has('KeyS')) this._moveInput.sub(forward);
-    if (this._keys.has('KeyD')) this._moveInput.add(right);
-    if (this._keys.has('KeyA')) this._moveInput.sub(right);
-    if (this._keys.has('Space')) this._moveInput.y += 1;
-    if (this._keys.has('ShiftLeft') || this._keys.has('ShiftRight')) {
+    if (input.isKeyDown('KeyW')) this._moveInput.add(forward);
+    if (input.isKeyDown('KeyS')) this._moveInput.sub(forward);
+    if (input.isKeyDown('KeyD')) this._moveInput.add(right);
+    if (input.isKeyDown('KeyA')) this._moveInput.sub(right);
+    if (input.isKeyDown('Space')) this._moveInput.y += 1;
+    if (input.isKeyDown('ShiftLeft') || input.isKeyDown('ShiftRight')) {
       this._moveInput.y -= 1;
     }
 
@@ -246,39 +251,49 @@ export class CameraController {
   }
 
   _applyLookFreeFly() {
-    if (this._lookDelta.x === 0 && this._lookDelta.y === 0) return;
+    if (document.pointerLockElement !== this.domElement) return;
+
+    const { x: dx, y: dy } = this.inputSystem.getMouseDelta();
+    if (dx === 0 && dy === 0) return;
 
     this._euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
-    this._euler.y -= this._lookDelta.x * this.lookSpeed;
-    this._euler.x -= this._lookDelta.y * this.lookSpeed;
+    this._euler.y -= dx * this.lookSpeed;
+    this._euler.x -= dy * this.lookSpeed;
     this._euler.x = THREE.MathUtils.clamp(this._euler.x, -PI_2 + 0.01, PI_2 - 0.01);
     this.camera.quaternion.setFromEuler(this._euler);
-
-    this._lookDelta.x = 0;
-    this._lookDelta.y = 0;
   }
 
   /**
    * @param {number} dt
    */
   _updateOrbit(dt) {
-    const dx = this._lookDelta.x;
-    const dy = this._lookDelta.y;
-    this._lookDelta.x = 0;
-    this._lookDelta.y = 0;
+    const input = this.inputSystem;
+    const { x: dx, y: dy } = input.getMouseDelta();
+    const dragging = input.isMouseDown(0);
+    const panning = input.isMouseDown(2);
 
-    if (this._orbitDragging) {
+    if (dragging) {
       this._orbitTheta -= dx * this.lookSpeed * 2.5;
       this._orbitPhi -= dy * this.lookSpeed * 2.5;
       this._orbitPhi = THREE.MathUtils.clamp(this._orbitPhi, 0.08, Math.PI - 0.08);
     }
 
-    if (this._orbitPanning) {
+    if (panning) {
       const panSpeed = this._orbitRadius * 0.0012;
       const right = this._scratchV3a.setFromMatrixColumn(this.camera.matrix, 0);
       const up = this._scratchV3b.setFromMatrixColumn(this.camera.matrix, 1);
       this.orbitTarget.addScaledVector(right, -dx * panSpeed);
       this.orbitTarget.addScaledVector(up, dy * panSpeed);
+    }
+
+    const scrollY = input.getScrollDelta().y;
+    if (scrollY !== 0) {
+      const zoomFactor = 1 + scrollY * 0.001;
+      this._orbitRadius = THREE.MathUtils.clamp(
+        this._orbitRadius * zoomFactor,
+        this.orbitMinDistance,
+        this.orbitMaxDistance,
+      );
     }
 
     this._applyOrbitPose();
@@ -322,8 +337,6 @@ export class CameraController {
   _prepareModeState(mode) {
     if (mode === MODE_ORBIT) {
       this._syncOrbitFromCamera();
-      this._orbitDragging = false;
-      this._orbitPanning = false;
     } else {
       this._euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
       this._velocity.set(0, 0, 0);
@@ -354,107 +367,6 @@ export class CameraController {
     }
   }
 
-  _attachInternalInput() {
-    const onKeyDown = (e) => {
-      if (!this._inputActive) return;
-      this._keys.add(e.code);
-    };
-    const onKeyUp = (e) => {
-      this._keys.delete(e.code);
-    };
-    const onBlur = () => {
-      this._keys.clear();
-      this._orbitDragging = false;
-      this._orbitPanning = false;
-    };
-
-    const onMouseDown = (e) => {
-      if (!this._inputActive || !this.enabled) return;
-      this._lastPointer.x = e.clientX;
-      this._lastPointer.y = e.clientY;
-
-      if (this.mode === MODE_FREEFLY && e.button === 0) {
-        this.domElement.requestPointerLock?.();
-      }
-      if (this.mode === MODE_ORBIT) {
-        if (e.button === 0) this._orbitDragging = true;
-        if (e.button === 2) this._orbitPanning = true;
-      }
-    };
-
-    const onMouseUp = (e) => {
-      if (e.button === 0) this._orbitDragging = false;
-      if (e.button === 2) this._orbitPanning = false;
-    };
-
-    const onMouseMove = (e) => {
-      if (!this._inputActive) return;
-
-      if (this.mode === MODE_FREEFLY && document.pointerLockElement === this.domElement) {
-        this._lookDelta.x += e.movementX;
-        this._lookDelta.y += e.movementY;
-        return;
-      }
-
-      if (this.mode === MODE_ORBIT && (this._orbitDragging || this._orbitPanning)) {
-        const dx = e.clientX - this._lastPointer.x;
-        const dy = e.clientY - this._lastPointer.y;
-        this._lastPointer.x = e.clientX;
-        this._lastPointer.y = e.clientY;
-        this._lookDelta.x += dx;
-        this._lookDelta.y += dy;
-      }
-    };
-
-    const onWheel = (e) => {
-      if (!this._inputActive || this.mode !== MODE_ORBIT) return;
-      e.preventDefault();
-      const zoomFactor = 1 + e.deltaY * 0.001;
-      this._orbitRadius = THREE.MathUtils.clamp(
-        this._orbitRadius * zoomFactor,
-        this.orbitMinDistance,
-        this.orbitMaxDistance,
-      );
-      this._applyOrbitPose();
-    };
-
-    const onContextMenu = (e) => {
-      if (this.mode === MODE_ORBIT) e.preventDefault();
-    };
-
-    const onPointerLockChange = () => {
-      this._pointerLocked = document.pointerLockElement === this.domElement;
-    };
-
-    this._addHandler(window, 'keydown', onKeyDown);
-    this._addHandler(window, 'keyup', onKeyUp);
-    this._addHandler(window, 'blur', onBlur);
-    this._addHandler(this.domElement, 'mousedown', onMouseDown);
-    this._addHandler(window, 'mouseup', onMouseUp);
-    this._addHandler(window, 'mousemove', onMouseMove);
-    this._addHandler(this.domElement, 'wheel', onWheel, { passive: false });
-    this._addHandler(this.domElement, 'contextmenu', onContextMenu);
-    this._addHandler(document, 'pointerlockchange', onPointerLockChange);
-  }
-
-  /**
-   * @param {EventTarget} target
-   * @param {string} type
-   * @param {(e: Event) => void} fn
-   * @param {AddEventListenerOptions} [options]
-   */
-  _addHandler(target, type, fn, options) {
-    target.addEventListener(type, fn, options);
-    this._handlers.set(`${type}:${fn}`, { target, type, fn, options });
-  }
-
-  _removeAllHandlers() {
-    for (const { target, type, fn, options } of this._handlers.values()) {
-      target.removeEventListener(type, fn, options);
-    }
-    this._handlers.clear();
-  }
-
   /**
    * @param {number} t
    */
@@ -463,11 +375,11 @@ export class CameraController {
   }
 
   dispose() {
-    this._removeAllHandlers();
+    this.inputSystem.off('mouseDown', this._handleMouseDown);
+    document.removeEventListener('pointerlockchange', this._handlePointerLockChange);
     if (document.pointerLockElement === this.domElement) {
       document.exitPointerLock?.();
     }
-    this._keys.clear();
     this.enabled = false;
   }
 }

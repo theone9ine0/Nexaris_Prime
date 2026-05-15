@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
 import { SceneManager } from './core/SceneManager.js';
 import { CameraController } from './core/CameraController.js';
+import { InputSystem } from './core/InputSystem.js';
 import { ChamberScene } from './scenes/chamberScene.js';
 import { VoidScene } from './scenes/voidScene.js';
 import { ExampleScene } from './scenes/ExampleScene.js';
@@ -32,6 +33,8 @@ cssRenderer.domElement.style.inset = '0';
 cssRenderer.domElement.style.pointerEvents = 'none';
 container.appendChild(cssRenderer.domElement);
 
+const inputSystem = new InputSystem({ domElement: webglRenderer.domElement });
+
 const sceneManager = new SceneManager({
   renderer: webglRenderer,
   camera,
@@ -43,6 +46,7 @@ const sceneManager = new SceneManager({
 const cameraController = new CameraController({
   camera,
   domElement: webglRenderer.domElement,
+  inputSystem,
   moveSpeed: 4,
   lookSpeed: 0.002,
   dampingFactor: 10,
@@ -66,49 +70,51 @@ function syncCameraToScene() {
   }
 }
 
+function setTraversalInputActive(active) {
+  cameraController.setInputActive(active);
+  if (!active) {
+    inputSystem.clearFrameState();
+  }
+}
+
 /**
  * @param {string} id
  * @param {Parameters<SceneManager['transitionTo']>[1]} [options]
  */
 async function switchScene(id, options) {
-  cameraController.setInputActive(false);
+  setTraversalInputActive(false);
   await sceneManager.transitionTo(id, options);
   syncCameraToScene();
-  cameraController.setInputActive(true);
+  setTraversalInputActive(true);
 }
 
 async function boot() {
-  cameraController.setInputActive(false);
+  setTraversalInputActive(false);
   await sceneManager.start('chamber');
   syncCameraToScene();
-  cameraController.setInputActive(true);
+  setTraversalInputActive(true);
 }
 
 boot();
 
-// Demo: 1/2/3 = scenes, O = toggle camera mode, S/L/P = anchors
-window.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
-    return;
-  }
-
-  if (e.key === '1') {
+inputSystem.on('keyDown', ({ code }) => {
+  if (code === 'Digit1') {
     switchScene('chamber', { transition: 'fade', duration: 0.8 });
   }
-  if (e.key === '2') {
+  if (code === 'Digit2') {
     switchScene('void', { transition: 'warp', duration: 1.0 });
   }
-  if (e.key === '3') {
+  if (code === 'Digit3') {
     switchScene('example', { transition: 'fade', duration: 0.7 });
   }
-  if (e.key === 'o' || e.key === 'O') {
+  if (code === 'KeyO') {
     cameraController.toggleMode();
   }
-  if (e.key === 's' || e.key === 'S') {
+  if (code === 'KeyS') {
     anchorManager.save('default', { label: 'Chamber snapshot' });
     console.info('[anchor] saved "default"', anchorManager.list());
   }
-  if (e.key === 'l' || e.key === 'L') {
+  if (code === 'KeyL') {
     if (anchorManager.has('default')) {
       anchorManager.load('default');
       cameraController.syncFromCamera();
@@ -117,10 +123,8 @@ window.addEventListener('keydown', (e) => {
       console.warn('[anchor] no "default" — press S to save first');
     }
   }
-  if (e.key === 'p' || e.key === 'P') {
-    if (anchorManager.has('default')) {
-      console.info(anchorManager.toJSON('default'));
-    }
+  if (code === 'KeyP' && anchorManager.has('default')) {
+    console.info(anchorManager.toJSON('default'));
   }
 });
 
@@ -138,12 +142,14 @@ function animate() {
   const delta = clock.getDelta();
 
   if (sceneManager.isTransitioning()) {
-    cameraController.setInputActive(false);
+    setTraversalInputActive(false);
   }
 
   sceneManager.update(delta);
   cameraController.update(delta);
   sceneManager.render();
+
+  inputSystem.update();
 }
 
 animate();
