@@ -14,3 +14,12 @@ export const SAMPLE_ROBOT_GLB =
 
 /** Vite public folder path when you add public/assets/models/duck.glb */
 export const LOCAL_DUCK_GLB = '/assets/models/duck.glb';
+
+/**
+ * VRM humanoid sample (pixiv/three-vrm). Supports VRM 0.x / 1.x via three-vrm loader.
+ * Place a local copy at /public/assets/models/avatar.vrm for offline use.
+ */
+export const SAMPLE_VRM_URL =
+  'https://cdn.jsdelivr.net/gh/pixiv/three-vrm@v3.5.2/packages/three-vrm/examples/models/VRM1_Constraint_Twist_Sample.vrm';
+
+export const LOCAL_VRM_URL = '/assets/models/avatar.vrm';

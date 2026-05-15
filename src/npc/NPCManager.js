@@ -4,6 +4,7 @@ import { NPC } from './NPC.js';
 /**
  * @typedef {import('../core/ModelManager.js').ModelManager} ModelManager
  * @typedef {import('../core/AnimationMixerManager.js').AnimationMixerManager} AnimationMixerManager
+ * @typedef {import('../core/AnimationSystem.js').AnimationSystem} AnimationSystem
  */
 
 /**
@@ -19,10 +20,12 @@ export class NPCManager {
    * @param {AnimationMixerManager} mixerManager
    * @param {ModelManager} modelManager
    */
-  constructor(scene, mixerManager, modelManager) {
+  constructor(scene, mixerManager, modelManager, animationSystem = null) {
     this.scene = scene;
     this.mixerManager = mixerManager;
     this.modelManager = modelManager;
+    /** @type {AnimationSystem | null} */
+    this.animationSystem = animationSystem;
 
     /** @type {Set<import('./NPC.js').NPC>} */
     this.npcs = new Set();
@@ -68,13 +71,57 @@ export class NPCManager {
   }
 
   /**
+   * @param {string} url VRM model URL
+   * @param {THREE.Vector3 | { x?: number, y?: number, z?: number }} position
+   * @param {Omit<NPCSpawnOptions, 'object' | 'animations' | 'mixerManager' | 'vrm'>} [options]
+   * @returns {Promise<import('./NPC.js').NPC>}
+   */
+  async spawnVRMNPC(url, position, options = {}) {
+    const { vrm, object, animations } = await this.modelManager.cloneVRM(url);
+    const pos =
+      position instanceof THREE.Vector3
+        ? position
+        : new THREE.Vector3(position.x ?? 0, position.y ?? 0, position.z ?? 0);
+
+    object.position.copy(pos);
+    if (options.scale != null) {
+      const s = options.scale;
+      if (typeof s === 'number') {
+        object.scale.setScalar(s);
+      } else {
+        object.scale.set(s.x ?? 1, s.y ?? 1, s.z ?? 1);
+      }
+    }
+
+    this.scene.add(object);
+
+    const npc = new NPC({
+      object,
+      vrm,
+      animations,
+      mixerManager: this.mixerManager,
+      modelManager: this.modelManager,
+      animationSystem: options.animationSystem ?? this.animationSystem,
+      id: options.id ?? `vrm_npc_${this._idCounter++}`,
+      ...options,
+    });
+
+    this.npcs.add(npc);
+    return npc;
+  }
+
+  /**
    * @param {import('./NPC.js').NPC} npc
    */
   removeNPC(npc) {
     if (!this.npcs.has(npc)) return;
 
     npc.dispose();
-    this.modelManager.disposeClone(npc.object);
+    if (npc.object.userData?.isVRM) {
+      this.modelManager.disposeVRMClone(npc.object);
+    } else {
+      this.modelManager.disposeClone(npc.object);
+    }
     this.npcs.delete(npc);
   }
 

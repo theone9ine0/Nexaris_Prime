@@ -110,7 +110,11 @@ export class SceneBase {
   _disposePlayer() {
     if (!this.player) return;
     this.player.dispose();
-    modelManager.disposeClone(this.player.object);
+    if (this.player.object.userData?.isVRM) {
+      modelManager.disposeVRMClone(this.player.object);
+    } else {
+      modelManager.disposeClone(this.player.object);
+    }
     this.setPlayer(null);
   }
 }

@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { AnimationStateMachine } from '../core/AnimationStateMachine.js';
 import { AvatarCustomizer } from './AvatarCustomizer.js';
+import { VRMAvatar } from '../vrm/VRMAvatar.js';
 import { resolveAnimationClips, HUMANOID_CLIP_PATTERNS } from './clipResolver.js';
+
+const _HEAD_OFFSET = new THREE.Vector3();
 
 const _UP = new THREE.Vector3(0, 1, 0);
 
@@ -12,6 +15,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
  * @typedef {import('../core/ModelManager.js').ModelManager} ModelManager
  * @typedef {import('./AvatarCustomizer.js').AvatarCustomizer} AvatarCustomizer
  * @typedef {import('./AvatarCustomizer.js').AvatarCustomizationConfig} AvatarCustomizationConfig
+ * @typedef {import('../vrm/VRMAvatar.js').VRMAvatar} VRMAvatar
+ * @typedef {import('../core/AnimationSystem.js').AnimationSystem} AnimationSystem
+ * @typedef {import('@pixiv/three-vrm').VRM} VRM
  */
 
 /**
@@ -22,6 +28,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
  *   cameraController: CameraController,
  *   mixerManager: AnimationMixerManager,
  *   modelManager?: ModelManager,
+ *   animationSystem?: AnimationSystem,
+ *   vrm?: VRM,
+ *   vrmAvatar?: VRMAvatar,
  *   customization?: AvatarCustomizationConfig,
  *   customizer?: AvatarCustomizer,
  *   clipMap?: Record<string, string>,
@@ -51,6 +60,22 @@ export class AvatarController {
     }
     this.mixerManager = options.mixerManager;
     this._modelManager = options.modelManager ?? null;
+    this._animationSystem = options.animationSystem ?? null;
+
+    /** @type {VRMAvatar | null} */
+    this.vrmAvatar =
+      options.vrmAvatar ??
+      (options.vrm
+        ? new VRMAvatar({
+            vrm: options.vrm,
+            mixerManager: this.mixerManager,
+            lookAtTarget: options.cameraController?.camera ?? null,
+          })
+        : null);
+
+    if (this.vrmAvatar && this._animationSystem) {
+      this._animationSystem.registerVRMAvatar(this.vrmAvatar);
+    }
 
     this.walkSpeed = options.walkSpeed ?? 2.2;
     this.runSpeed = options.runSpeed ?? 4.5;
@@ -110,6 +135,13 @@ export class AvatarController {
   /**
    * @returns {AvatarCustomizer | null}
    */
+  /**
+   * @returns {VRMAvatar | null}
+   */
+  getVRMAvatar() {
+    return this.vrmAvatar;
+  }
+
   getCustomizer() {
     if (!this.customizer && this._modelManager) {
       this.customizer = new AvatarCustomizer({
@@ -148,6 +180,7 @@ export class AvatarController {
       onHoverExit() {},
       onClick() {
         self.triggerEmote();
+        self.vrmAvatar?.playExpression('happy', 0.5);
       },
     };
     hitMesh.userData.interactive = this._interactive;
@@ -177,6 +210,7 @@ export class AvatarController {
         fadeIn: 0.12,
       });
     }
+    this.vrmAvatar?.playExpression('happy', 0.6);
   }
 
   /**
@@ -186,6 +220,35 @@ export class AvatarController {
     const dt = Math.min(deltaTime, 0.05);
     this._updateMovement(dt);
     this._updateLocomotionAnimation();
+    this._updateVRMFollowCamera();
+    this._updateVRMLocomotionExpression();
+  }
+
+  _updateVRMFollowCamera() {
+    if (!this.vrmAvatar || !this.cameraController?.followTarget) return;
+    if (this.cameraController.followTarget !== this.object) return;
+
+    const head = this.vrmAvatar.getHeadBone();
+    if (!head) return;
+
+    head.getWorldPosition(_HEAD_OFFSET);
+    this.cameraController.followLookAtOffset.set(
+      0,
+      _HEAD_OFFSET.y - this.object.position.y,
+      0,
+    );
+  }
+
+  _updateVRMLocomotionExpression() {
+    if (!this.vrmAvatar) return;
+
+    if (this._locomotionState === 'run') {
+      this.vrmAvatar.setExpression('relaxed', 0.15);
+    } else if (this._locomotionState === 'walk') {
+      this.vrmAvatar.setExpression('relaxed', 0.08);
+    } else {
+      this.vrmAvatar.setExpression('relaxed', 0);
+    }
   }
 
   /**
@@ -303,6 +366,11 @@ export class AvatarController {
   }
 
   dispose() {
+    if (this.vrmAvatar && this._animationSystem) {
+      this._animationSystem.unregisterVRMAvatar(this.vrmAvatar);
+    }
+    this.vrmAvatar?.dispose();
+    this.vrmAvatar = null;
     this.customizer?.dispose();
     this.customizer = null;
     this.stateMachine?.dispose();

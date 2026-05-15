@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { AnimationStateMachine } from '../core/AnimationStateMachine.js';
 import { AvatarCustomizer } from '../avatars/AvatarCustomizer.js';
+import { VRMAvatar } from '../vrm/VRMAvatar.js';
 import {
   resolveAnimationClips,
   HUMANOID_CLIP_PATTERNS,
@@ -15,6 +16,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
  * @typedef {import('../core/ModelManager.js').ModelManager} ModelManager
  * @typedef {import('../avatars/AvatarCustomizer.js').AvatarCustomizer} AvatarCustomizer
  * @typedef {import('../avatars/AvatarCustomizer.js').AvatarCustomizationConfig} AvatarCustomizationConfig
+ * @typedef {import('../vrm/VRMAvatar.js').VRMAvatar} VRMAvatar
+ * @typedef {import('../core/AnimationSystem.js').AnimationSystem} AnimationSystem
+ * @typedef {import('@pixiv/three-vrm').VRM} VRM
  */
 
 /**
@@ -23,6 +27,10 @@ const _UP = new THREE.Vector3(0, 1, 0);
  *   animations?: THREE.AnimationClip[],
  *   mixerManager: AnimationMixerManager,
  *   modelManager?: ModelManager,
+ *   animationSystem?: AnimationSystem,
+ *   vrm?: VRM,
+ *   vrmAvatar?: VRMAvatar,
+ *   lookAtTarget?: THREE.Object3D | null,
  *   customization?: AvatarCustomizationConfig,
  *   customizer?: AvatarCustomizer,
  *   id?: string,
@@ -54,6 +62,7 @@ export class NPC {
     this.object = options.object;
     this.mixerManager = options.mixerManager;
     this._modelManager = options.modelManager ?? null;
+    this._animationSystem = options.animationSystem ?? null;
     this.id = options.id ?? options.object.name ?? `npc_${Date.now()}`;
     this.object.name = this.id;
 
@@ -115,7 +124,37 @@ export class NPC {
           })
         : null);
 
+    /** @type {VRMAvatar | null} */
+    this.vrmAvatar =
+      options.vrmAvatar ??
+      (options.vrm
+        ? new VRMAvatar({
+            vrm: options.vrm,
+            mixerManager: this.mixerManager,
+            lookAtTarget: options.lookAtTarget ?? null,
+          })
+        : null);
+
+    if (this.vrmAvatar && this._animationSystem) {
+      this._animationSystem.registerVRMAvatar(this.vrmAvatar);
+    }
+
     this._setupInteraction();
+  }
+
+  /**
+   * @returns {VRMAvatar | null}
+   */
+  getVRMAvatar() {
+    return this.vrmAvatar;
+  }
+
+  /**
+   * @param {string} name
+   * @param {number} [duration]
+   */
+  playExpression(name, duration = 0.4) {
+    this.vrmAvatar?.playExpression(name, duration);
   }
 
   /**
@@ -213,6 +252,7 @@ export class NPC {
     });
 
     this.onInteract?.();
+    this.vrmAvatar?.playExpression('happy', 0.55);
 
     this._interactFinishUnsub?.();
     this._interactFinishUnsub = this.mixerManager.onFinished(this.object, (event) => {
@@ -397,6 +437,11 @@ export class NPC {
   }
 
   dispose() {
+    if (this.vrmAvatar && this._animationSystem) {
+      this._animationSystem.unregisterVRMAvatar(this.vrmAvatar);
+    }
+    this.vrmAvatar?.dispose();
+    this.vrmAvatar = null;
     this.customizer?.dispose();
     this.customizer = null;
     this._interactFinishUnsub?.();

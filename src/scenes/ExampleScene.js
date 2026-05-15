@@ -3,15 +3,13 @@ import { SceneBase } from './SceneBase.js';
 import { modelManager } from '../core/ModelManager.js';
 import { AvatarController } from '../avatars/AvatarController.js';
 import { NPCManager } from '../npc/NPCManager.js';
-import {
-  SAMPLE_DUCK_GLB,
-  SAMPLE_FOX_GLB,
-  SAMPLE_ROBOT_GLB,
-} from '../assets/modelUrls.js';
-import { NEXARIS_DEFAULT_PRESET } from '../avatars/presets/nexarisDefault.js';
+import { SAMPLE_ROBOT_GLB, SAMPLE_VRM_URL } from '../assets/modelUrls.js';
+
+const EXPRESSION_CYCLE = ['happy', 'angry', 'sad', 'surprised'];
+let _expressionIndex = 0;
 
 /**
- * Example dimension — playable avatar, wandering NPCs, shards, and props.
+ * Example dimension — VRM player avatar, NPCs, shards, and props.
  */
 export class ExampleScene extends SceneBase {
   constructor() {
@@ -111,32 +109,14 @@ export class ExampleScene extends SceneBase {
     this._avatarLoading = true;
 
     try {
-      const { object, animations } = await modelManager.cloneModel(SAMPLE_ROBOT_GLB);
-      object.name = 'player_avatar';
-      object.position.set(0, 0, 0);
-      object.scale.setScalar(1);
-      this.scene.add(object);
-
-      const avatar = new AvatarController({
-        object,
-        animations,
-        inputSystem: this.inputSystem,
-        cameraController: this.cameraController,
-        mixerManager: this._animationSystem.mixerManager,
-        modelManager,
-        groundY: 0,
-        walkSpeed: 2.4,
-        runSpeed: 5,
-      });
-
-      await this._applyExampleCustomization(avatar);
+      const avatar = await this._trySpawnVRMAvatar();
+      if (!avatar) {
+        await this._spawnRobotAvatar();
+        return;
+      }
 
       this.setPlayer(avatar);
-      this.cameraController.followTarget(avatar.object, {
-        offset: new THREE.Vector3(0, 2.4, 5),
-        lookAtOffset: new THREE.Vector3(0, 1.2, 0),
-      });
-
+      this._configurePlayerCamera(avatar);
       this.npcManager?.setFollowTarget(avatar.object);
       this.interactionSystem?.rebuildTargets();
     } catch (err) {
@@ -147,39 +127,84 @@ export class ExampleScene extends SceneBase {
   }
 
   /**
-   * Demo PR34 — part swaps, recolor, emissive, and bone-attached accessories.
+   * @returns {Promise<import('../avatars/AvatarController.js').AvatarController | null>}
+   */
+  async _trySpawnVRMAvatar() {
+    try {
+      const { vrm, object, animations } = await modelManager.cloneVRM(SAMPLE_VRM_URL);
+      object.name = 'player_vrm';
+      object.position.set(0, 0, 0);
+      object.scale.setScalar(1);
+
+      let clips = animations;
+      if (!clips.length) {
+        await modelManager.loadModel(SAMPLE_ROBOT_GLB);
+        clips = modelManager.getCached(SAMPLE_ROBOT_GLB)?.animations ?? [];
+      }
+
+      this.scene.add(object);
+
+      const avatar = new AvatarController({
+        object,
+        vrm,
+        animations: clips,
+        inputSystem: this.inputSystem,
+        cameraController: this.cameraController,
+        mixerManager: this._animationSystem.mixerManager,
+        animationSystem: this._animationSystem,
+        modelManager,
+        groundY: 0,
+        walkSpeed: 2.2,
+        runSpeed: 4.5,
+      });
+
+      avatar.vrmAvatar?.setLookAtTarget(this.cameraController.camera);
+      avatar.vrmAvatar?.setBlink(true);
+
+      if (clips.length > 0) {
+        this._animationSystem.mixerManager.play(object, clips[0].name, {
+          loop: THREE.LoopRepeat,
+          fadeIn: 0,
+        });
+      }
+
+      return avatar;
+    } catch (err) {
+      console.warn('[ExampleScene] VRM avatar unavailable, using GLB fallback:', err);
+      return null;
+    }
+  }
+
+  async _spawnRobotAvatar() {
+    const { object, animations } = await modelManager.cloneModel(SAMPLE_ROBOT_GLB);
+    object.name = 'player_avatar';
+    object.position.set(0, 0, 0);
+    this.scene.add(object);
+
+    const avatar = new AvatarController({
+      object,
+      animations,
+      inputSystem: this.inputSystem,
+      cameraController: this.cameraController,
+      mixerManager: this._animationSystem.mixerManager,
+      modelManager,
+      groundY: 0,
+      walkSpeed: 2.4,
+      runSpeed: 5,
+    });
+
+    this.setPlayer(avatar);
+    this._configurePlayerCamera(avatar);
+  }
+
+  /**
    * @param {import('../avatars/AvatarController.js').AvatarController} avatar
    */
-  async _applyExampleCustomization(avatar) {
-    const customizer = avatar.getCustomizer();
-    if (!customizer) return;
-
-    try {
-      await customizer.applyCustomization(NEXARIS_DEFAULT_PRESET);
-
-      customizer.setColor('hair', 0x88ccff);
-      customizer.setMaterial('outfit', {
-        emissive: 0x113355,
-        emissiveIntensity: 0.25,
-        metalness: 0.5,
-        roughness: 0.45,
-      });
-
-      await customizer.setPart('hair', SAMPLE_FOX_GLB);
-      await customizer.setPart('outfit', SAMPLE_ROBOT_GLB);
-      await customizer.setPart('head', SAMPLE_DUCK_GLB);
-
-      await customizer.attachAccessory(SAMPLE_DUCK_GLB, 'RightHand', {
-        id: 'sword_prop',
-        scale: 0.1,
-        position: { x: 0.08, y: 0.05, z: 0 },
-        rotation: { x: 0.2, y: 0, z: -0.4 },
-      });
-
-      customizer.savePreset('example_player', customizer.exportConfig());
-    } catch (err) {
-      console.warn('[ExampleScene] Avatar customization demo failed:', err);
-    }
+  _configurePlayerCamera(avatar) {
+    this.cameraController.followTarget(avatar.object, {
+      offset: new THREE.Vector3(0, 2.4, 5),
+      lookAtOffset: new THREE.Vector3(0, 1.2, 0),
+    });
   }
 
   async _spawnNPCs() {
@@ -191,40 +216,48 @@ export class ExampleScene extends SceneBase {
       this.scene,
       this._animationSystem.mixerManager,
       modelManager,
+      this._animationSystem,
     );
 
     const spawns = [
-      { x: -4, z: 2, wanderRadius: 3.5 },
-      { x: 4, z: 1, wanderRadius: 4 },
-      { x: 0, z: -3, wanderRadius: 3 },
+      { x: -4, z: 2, wanderRadius: 3.5, useVrm: true },
+      { x: 4, z: 1, wanderRadius: 4, useVrm: false },
+      { x: 0, z: -3, wanderRadius: 3, useVrm: false },
     ];
 
     try {
       for (let i = 0; i < spawns.length; i++) {
         const s = spawns[i];
-        const npc = await this.npcManager.spawnNPC(
-          SAMPLE_ROBOT_GLB,
-          new THREE.Vector3(s.x, 0, s.z),
-          {
-            id: `npc_guard_${i}`,
-            scale: 0.92,
-            initialState: 'wander',
-            wanderRadius: s.wanderRadius,
-            walkSpeed: 1.2,
-            onInteract: () => {
-              console.info(`[NPC] ${`npc_guard_${i}`} emote triggered`);
-            },
+        const pos = new THREE.Vector3(s.x, 0, s.z);
+        const baseOptions = {
+          id: `npc_guard_${i}`,
+          scale: 0.92,
+          initialState: 'wander',
+          wanderRadius: s.wanderRadius,
+          walkSpeed: 1.2,
+          lookAtTarget: this.cameraController?.camera ?? null,
+          onInteract: () => {
+            console.info(`[NPC] npc_guard_${i} interact`);
           },
-        );
+        };
+
+        let npc;
+        if (s.useVrm) {
+          try {
+            npc = await this.npcManager.spawnVRMNPC(SAMPLE_VRM_URL, pos, baseOptions);
+            npc.vrmAvatar?.setLookAtTarget(this.cameraController?.camera ?? null);
+            npc.playExpression('relaxed', 0.3);
+          } catch {
+            npc = await this.npcManager.spawnNPC(SAMPLE_ROBOT_GLB, pos, baseOptions);
+          }
+        } else {
+          npc = await this.npcManager.spawnNPC(SAMPLE_ROBOT_GLB, pos, baseOptions);
+        }
 
         const npcCustomizer = npc.getCustomizer?.();
         if (npcCustomizer) {
           const tint = [0xcc6644, 0x44aa88, 0xaa66cc][i];
           npcCustomizer.setColor('body', tint);
-          npcCustomizer.setMaterial('body', {
-            emissive: tint,
-            emissiveIntensity: 0.15,
-          });
         }
       }
 
@@ -242,6 +275,9 @@ export class ExampleScene extends SceneBase {
 
   onInteractClick(target) {
     if (target === this.player?._interactive || target?.id === this.player?.id) {
+      const expr = EXPRESSION_CYCLE[_expressionIndex % EXPRESSION_CYCLE.length];
+      _expressionIndex += 1;
+      this.player?.vrmAvatar?.playExpression(expr, 0.55);
       this.player?.triggerEmote();
       return;
     }
@@ -250,6 +286,7 @@ export class ExampleScene extends SceneBase {
       ?.getAllNPCs()
       .find((n) => n.id === target?.id || n._interactive === target);
     if (npc) {
+      npc.playExpression?.('angry', 0.45);
       npc.triggerInteract();
     }
   }

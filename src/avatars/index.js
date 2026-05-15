@@ -1,4 +1,5 @@
 export { AvatarController } from './AvatarController.js';
+export { VRMAvatar, VRM_SPRING_BONE_LIMIT } from '../vrm/VRMAvatar.js';
 export { AvatarCustomizer } from './AvatarCustomizer.js';
 export { AVATAR_SLOTS, getSlotDef } from './avatarSlots.js';
 export { AvatarPresetStore, avatarPresetStore } from './presetStore.js';
