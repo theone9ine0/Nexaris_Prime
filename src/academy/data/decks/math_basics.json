@@ -1,0 +1,12 @@
+{
+  "id": "math_basics",
+  "title": "Math Basics",
+  "subject": "math",
+  "tags": ["arithmetic", "nexaris"],
+  "cards": [
+    { "id": "m1", "front": "2 + 2", "back": "4", "tags": ["addition"], "difficulty": 1 },
+    { "id": "m2", "front": "5 × 3", "back": "15", "tags": ["multiplication"], "difficulty": 2 },
+    { "id": "m3", "front": "√16", "back": "4", "tags": ["roots"], "difficulty": 2 },
+    { "id": "m4", "front": "10% of 50", "back": "5", "tags": ["percent"], "difficulty": 3 }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "id": "programming_basics",
+  "title": "Programming Basics",
+  "subject": "programming",
+  "tags": ["code", "nexaris"],
+  "cards": [
+    { "id": "p1", "front": "Loop that runs while true?", "back": "while loop", "tags": ["control"], "difficulty": 2 },
+    { "id": "p2", "front": "JS: declare constant?", "back": "const", "tags": ["javascript"], "difficulty": 1 },
+    { "id": "p3", "front": "Git: save changes locally?", "back": "commit", "tags": ["git"], "difficulty": 2 },
+    { "id": "p4", "front": "HTML: hyperlink tag?", "back": "<a>", "tags": ["html"], "difficulty": 1 }
+  ]
+}

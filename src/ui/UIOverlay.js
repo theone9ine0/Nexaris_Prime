@@ -33,8 +33,14 @@ export class UIOverlay {
     this.scanBanner.innerHTML =
       '<strong>Scan Chamber</strong> — Upload 360° photos · Generate stylized avatar · Exit via portal';
 
+    this.academyBanner = document.createElement('div');
+    this.academyBanner.className = 'academy-banner hidden';
+    this.academyBanner.innerHTML =
+      '<strong>Nexaris Academy</strong> — Flashcards · Lessons · Quizzes · Portals to chambers';
+
     this.root.appendChild(this.panel);
     this.root.appendChild(this.scanBanner);
+    this.root.appendChild(this.academyBanner);
     this.container?.appendChild(this.root);
 
     this._fullText = '';
@@ -134,6 +140,14 @@ export class UIOverlay {
 
   hideScanChamberBanner() {
     this.scanBanner?.classList.add('hidden');
+  }
+
+  showAcademyBanner() {
+    this.academyBanner?.classList.remove('hidden');
+  }
+
+  hideAcademyBanner() {
+    this.academyBanner?.classList.add('hidden');
   }
 
   hideDialogue() {

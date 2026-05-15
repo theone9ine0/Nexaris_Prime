@@ -1,0 +1,26 @@
+{
+  "id": "math_quiz",
+  "title": "Math Quiz",
+  "subject": "math",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "multiple_choice",
+      "prompt": "What is 7 × 8?",
+      "options": ["54", "56", "58", "64"],
+      "answer": "56"
+    },
+    {
+      "id": "q2",
+      "type": "true_false",
+      "prompt": "π is exactly 3.14.",
+      "answer": false
+    },
+    {
+      "id": "q3",
+      "type": "fill_blank",
+      "prompt": "The square root of 81 is ____.",
+      "answer": "9"
+    }
+  ]
+}

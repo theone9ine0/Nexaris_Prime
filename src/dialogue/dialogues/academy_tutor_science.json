@@ -1,0 +1,12 @@
+{
+  "id": "academy_tutor_science",
+  "lines": [
+    {
+      "speaker": "Dr. Nova",
+      "text": "Science in Nexaris is all holograms and wonder — no boring lectures. Try the Quiz Arena when you're ready!",
+      "choices": [
+        { "text": "Thanks!", "next": null }
+      ]
+    }
+  ]
+}

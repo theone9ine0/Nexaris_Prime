@@ -8,6 +8,7 @@ import { scanSession } from '../scan/AvatarScanManager.js';
 import { AvatarScanManager } from '../scan/AvatarScanManager.js';
 import { PortalManager } from '../portals/PortalManager.js';
 import { SCAN_CHAMBER_SCENE_ID } from './ScanChamberScene.js';
+import { ACADEMY_SCENE_ID } from './academySceneIds.js';
 
 const EXPRESSION_CYCLE = ['happy', 'angry', 'sad', 'surprised'];
 let _expressionIndex = 0;
@@ -134,12 +135,22 @@ export class ExampleScene extends SceneBase {
     this.portalManager.createPortal({
       id: 'portal_scan_chamber',
       targetSceneId: SCAN_CHAMBER_SCENE_ID,
-      position: new THREE.Vector3(0, 1.2, 5),
+      position: new THREE.Vector3(-1.5, 1.2, 5),
       color: 0x88ddff,
       colorOuter: 0xffffff,
       radius: 0.9,
       frameStyle: 'crystal',
       label: 'SCAN CHAMBER',
+    });
+    this.portalManager.createPortal({
+      id: 'portal_academy',
+      targetSceneId: ACADEMY_SCENE_ID,
+      position: new THREE.Vector3(1.5, 1.2, 5),
+      color: 0xaa88ff,
+      colorOuter: 0xffffff,
+      radius: 0.9,
+      frameStyle: 'arch',
+      label: 'ACADEMY',
     });
 
     this.interactionSystem?.rebuildTargets();

@@ -15,6 +15,17 @@ import {
   SCAN_CHAMBER_ALIAS,
   MAIN_WORLD_SCENE_ID,
 } from './scenes/ScanChamberScene.js';
+import { AcademyDimension } from './scenes/AcademyDimension.js';
+import { FlashcardChamber } from './scenes/FlashcardChamber.js';
+import { LessonHall } from './scenes/LessonHall.js';
+import { QuizArena } from './scenes/QuizArena.js';
+import { AcademyController } from './academy/AcademyController.js';
+import {
+  ACADEMY_SCENE_ID,
+  FLASHCARD_CHAMBER_SCENE_ID,
+  LESSON_HALL_SCENE_ID,
+  QUIZ_ARENA_SCENE_ID,
+} from './scenes/academySceneIds.js';
 import { CombatHUD } from './combat/CombatHUD.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 import { modelManager } from './core/ModelManager.js';
@@ -143,6 +154,32 @@ sceneManager.registerScene('scan_chamber', scanChamberScene);
 sceneManager.registerSceneAlias(SCAN_CHAMBER_ALIAS, 'scan_chamber');
 sceneManager.registerSceneAlias(MAIN_WORLD_SCENE_ID, 'example');
 
+const academyController = new AcademyController(container);
+academyController.init().catch((err) => console.warn('[Academy] init failed:', err));
+
+const academyDimension = new AcademyDimension();
+academyDimension.mountAcademy(academyController, uiOverlay);
+sceneManager.registerScene(ACADEMY_SCENE_ID, academyDimension);
+
+const flashcardChamber = new FlashcardChamber();
+flashcardChamber.mountAcademy(academyController);
+sceneManager.registerScene(FLASHCARD_CHAMBER_SCENE_ID, flashcardChamber);
+
+const lessonHall = new LessonHall();
+lessonHall.mountAcademy(academyController);
+sceneManager.registerScene(LESSON_HALL_SCENE_ID, lessonHall);
+
+const quizArena = new QuizArena();
+quizArena.mountAcademy(academyController);
+sceneManager.registerScene(QUIZ_ARENA_SCENE_ID, quizArena);
+
+const ACADEMY_SCENES = new Set([
+  ACADEMY_SCENE_ID,
+  FLASHCARD_CHAMBER_SCENE_ID,
+  LESSON_HALL_SCENE_ID,
+  QUIZ_ARENA_SCENE_ID,
+]);
+
 const anchorManager = new AnchorManager({ sceneManager });
 
 const _lookTarget = new THREE.Vector3(0, 0, 0);
@@ -186,8 +223,10 @@ async function switchScene(id, options) {
   });
   interactionSystem.rebuildTargets();
   syncCameraToScene();
-  const isCombat = id === 'combat_zone';
-  const isScan = id === 'scan_chamber';
+  const resolved = sceneManager.resolveSceneId(id);
+  const isCombat = resolved === 'combat_zone';
+  const isScan = resolved === 'scan_chamber';
+  const isAcademy = ACADEMY_SCENES.has(resolved);
   interactionSystem.setEnabled(!isCombat);
   setTraversalInputActive(true);
   if (isCombat) {
@@ -200,6 +239,14 @@ async function switchScene(id, options) {
     scanChamberScene.scanUI?.show();
   } else {
     scanChamberScene.scanUI?.hide();
+  }
+  if (isAcademy) {
+    academyController.show();
+    if (resolved === ACADEMY_SCENE_ID) uiOverlay.showAcademyBanner();
+    else uiOverlay.hideAcademyBanner();
+  } else {
+    academyController.hide();
+    uiOverlay.hideAcademyBanner();
   }
   if (sceneManager.currentScene?.player) {
     webglRenderer.domElement.requestPointerLock?.();
@@ -237,6 +284,9 @@ inputSystem.on('keyDown', ({ code }) => {
   }
   if (code === 'Digit7') {
     switchScene('scan_chamber', { transition: 'warp', duration: 0.85 });
+  }
+  if (code === 'Digit8') {
+    switchScene(ACADEMY_SCENE_ID, { transition: 'warp', duration: 0.85 });
   }
   if (code === 'KeyO' && !sceneManager.currentScene?.player) {
     cameraController.toggleMode();

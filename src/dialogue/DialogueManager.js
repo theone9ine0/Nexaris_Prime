@@ -1,5 +1,9 @@
 import npcIntro from './dialogues/npc_intro.json';
 import npcMore from './dialogues/npc_more.json';
+import academyTutorMath from './dialogues/academy_tutor_math.json';
+import academyTutorMathCards from './dialogues/academy_tutor_math_cards.json';
+import academyTutorScience from './dialogues/academy_tutor_science.json';
+import academyLessonGuide from './dialogues/academy_lesson_guide.json';
 
 /**
  * @typedef {{
@@ -41,6 +45,10 @@ import npcMore from './dialogues/npc_more.json';
 const BUNDLED_DIALOGUES = {
   npc_intro: npcIntro,
   npc_more: npcMore,
+  academy_tutor_math: academyTutorMath,
+  academy_tutor_math_cards: academyTutorMathCards,
+  academy_tutor_science: academyTutorScience,
+  academy_lesson_guide: academyLessonGuide,
 };
 
 /**

@@ -1,0 +1,13 @@
+{
+  "id": "academy_tutor_math",
+  "lines": [
+    {
+      "speaker": "Professor Pi",
+      "text": "Welcome to the Math island! I can help you balance equations like floating scales in zero-g.",
+      "choices": [
+        { "text": "Start flashcards", "next": "academy_tutor_math_cards" },
+        { "text": "Maybe later", "next": null }
+      ]
+    }
+  ]
+}

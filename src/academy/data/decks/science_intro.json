@@ -1,0 +1,12 @@
+{
+  "id": "science_intro",
+  "title": "Science Intro",
+  "subject": "science",
+  "tags": ["physics", "nexaris"],
+  "cards": [
+    { "id": "s1", "front": "Symbol for water?", "back": "H₂O", "tags": ["chemistry"], "difficulty": 1 },
+    { "id": "s2", "front": "Planets in our solar system?", "back": "8", "tags": ["astronomy"], "difficulty": 2 },
+    { "id": "s3", "front": "Speed of light (approx.)", "back": "3×10⁸ m/s", "tags": ["physics"], "difficulty": 3 },
+    { "id": "s4", "front": "Center of an atom?", "back": "Nucleus", "tags": ["atoms"], "difficulty": 2 }
+  ]
+}

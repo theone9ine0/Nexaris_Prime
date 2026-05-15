@@ -1,0 +1,13 @@
+{
+  "id": "academy_lesson_guide",
+  "lines": [
+    {
+      "speaker": "Holo Guide",
+      "text": "These panels hold your lesson scrolls. Use the UI on the right to flip sections — I'll glow brighter when you learn something new.",
+      "choices": [
+        { "text": "Next section", "next": null },
+        { "text": "Got it", "next": null }
+      ]
+    }
+  ]
+}

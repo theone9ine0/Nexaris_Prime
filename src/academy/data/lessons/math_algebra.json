@@ -1,0 +1,25 @@
+{
+  "id": "math_algebra",
+  "title": "Intro to Algebra",
+  "subject": "math",
+  "sections": [
+    {
+      "id": "intro",
+      "title": "What is a variable?",
+      "text": "A variable is a symbol (like x) that stands for an unknown value. In Nexaris Academy, we treat variables as glowing energy tokens you can swap and balance.",
+      "diagram": "x + 3 = 7  →  x = 4"
+    },
+    {
+      "id": "balance",
+      "title": "Balancing equations",
+      "text": "Whatever you do to one side of an equation, do to the other. Imagine a floating scale on a knowledge island — keep both sides level.",
+      "diagram": "2x = 10  →  x = 5"
+    },
+    {
+      "id": "practice",
+      "title": "Quick practice",
+      "text": "Try solving: 3x + 2 = 11. Subtract 2 from both sides, then divide by 3. Answer: x = 3.",
+      "diagram": "3x + 2 = 11"
+    }
+  ]
+}

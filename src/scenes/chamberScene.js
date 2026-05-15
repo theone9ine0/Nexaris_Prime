@@ -3,6 +3,7 @@ import { SceneBase } from './SceneBase.js';
 import { NEXARIS_EFFECTS_PRESET } from '../effects/index.js';
 import { PortalManager } from '../portals/PortalManager.js';
 import { SCAN_CHAMBER_SCENE_ID } from './ScanChamberScene.js';
+import { ACADEMY_SCENE_ID } from './academySceneIds.js';
 
 /**
  * Primary chamber dimension: orb, PR1 shards, PR2 clusters.
@@ -172,13 +173,24 @@ export class ChamberScene extends SceneBase {
     this.portalManager.createPortal({
       id: 'portal_scan_chamber',
       targetSceneId: SCAN_CHAMBER_SCENE_ID,
-      position: new THREE.Vector3(0, 1.1, -3.5),
+      position: new THREE.Vector3(-1.4, 1.1, -3.5),
       color: 0x66ddff,
       colorOuter: 0xffffff,
       radius: 0.95,
       frameStyle: 'crystal',
       label: 'SCAN CHAMBER',
     });
+    this.portalManager.createPortal({
+      id: 'portal_academy',
+      targetSceneId: ACADEMY_SCENE_ID,
+      position: new THREE.Vector3(1.4, 1.1, -3.5),
+      color: 0xaa88ff,
+      colorOuter: 0xffffff,
+      radius: 0.95,
+      frameStyle: 'arch',
+      label: 'ACADEMY',
+    });
+    this.interactionSystem?.rebuildTargets();
   }
 
   configureEffects(effects) {

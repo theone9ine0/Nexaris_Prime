@@ -1,0 +1,19 @@
+{
+  "id": "science_atoms",
+  "title": "Atoms & Elements",
+  "subject": "science",
+  "sections": [
+    {
+      "id": "atom",
+      "title": "Atomic structure",
+      "text": "Atoms have a nucleus (protons + neutrons) surrounded by electrons. In our stylized holo-lessons, electrons orbit like tiny shard satellites.",
+      "diagram": "nucleus ●  electrons ○ ○ ○"
+    },
+    {
+      "id": "element",
+      "title": "Elements",
+      "text": "An element is defined by its number of protons. Carbon has 6 protons — that's why its atomic number is 6.",
+      "diagram": "C = 6 protons"
+    }
+  ]
+}
