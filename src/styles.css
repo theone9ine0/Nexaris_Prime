@@ -403,3 +403,28 @@ body {
   background: linear-gradient(135deg, #226655, #44aa88);
   border-color: rgba(120, 255, 180, 0.45);
 }
+
+.scan-chamber-banner {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.45rem 1rem;
+  border-radius: 0.5rem;
+  background: rgba(8, 14, 28, 0.82);
+  border: 1px solid rgba(120, 200, 255, 0.35);
+  font-family: system-ui, sans-serif;
+  font-size: 0.72rem;
+  color: rgba(200, 230, 255, 0.85);
+  pointer-events: none;
+  z-index: 19;
+}
+
+.scan-chamber-banner.hidden {
+  display: none;
+}
+
+.scan-chamber-banner strong {
+  color: #aaddff;
+  font-weight: 700;
+}

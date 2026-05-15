@@ -26,6 +26,7 @@ import {
  *   isProcedural?: boolean,
  *   sceneManager?: SceneManager | null,
  *   onActivate?: (portal: Portal) => void,
+ *   label?: string,
  * }} PortalOptions
  */
 
@@ -48,6 +49,7 @@ export class Portal extends THREE.Group {
     this.onActivate = options.onActivate ?? null;
     this.isProcedural = options.isProcedural ?? isProceduralSceneId(this.targetSceneId);
     this.visualTheme = options.visualTheme ?? null;
+    this.label = options.label ?? null;
 
     const color = options.color ?? 0x66ccff;
     const colorOuter = options.colorOuter ?? color;
@@ -81,7 +83,46 @@ export class Portal extends THREE.Group {
       this.position.set(pos.x ?? 0, pos.y ?? 0, pos.z ?? 0);
     }
 
+    if (options.label) {
+      this._labelSprite = this._createLabelSprite(options.label, color);
+      this._labelSprite.position.y = radius + 0.55;
+      this.add(this._labelSprite);
+    }
+
     this._bindInteraction(color);
+  }
+
+  /**
+   * @param {string} text
+   * @param {number} color
+   */
+  _createLabelSprite(text, color) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = 'rgba(0,0,0,0)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = 'bold 42px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 12;
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthWrite: false,
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.scale.set(2.2, 0.55, 1);
+    return sprite;
   }
 
   /**
@@ -237,7 +278,7 @@ export class Portal extends THREE.Group {
       id: this.id,
       mesh: hitMesh,
       metadata: {
-        title: this.isProcedural ? 'Procedural Portal' : 'Portal',
+        title: this.label ?? (this.isProcedural ? 'Procedural Portal' : 'Portal'),
         type: 'portal',
         payload: {
           targetSceneId: this.targetSceneId,

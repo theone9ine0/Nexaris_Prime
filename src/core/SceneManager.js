@@ -52,6 +52,8 @@ export class SceneManager {
 
     /** @type {Map<string, import('../scenes/SceneBase.js').SceneBase>} */
     this._registry = new Map();
+    /** @type {Map<string, string>} scene id aliases (PR44) */
+    this._aliases = new Map();
 
     /** @type {import('../scenes/SceneBase.js').SceneBase | null} */
     this.currentScene = null;
@@ -113,11 +115,28 @@ export class SceneManager {
   }
 
   /**
+   * @param {string} aliasId
+   * @param {string} targetId
+   */
+  registerSceneAlias(aliasId, targetId) {
+    this._aliases.set(aliasId, targetId);
+  }
+
+  /**
+   * @param {string} id
+   * @returns {string}
+   */
+  resolveSceneId(id) {
+    return this._aliases.get(id) ?? id;
+  }
+
+  /**
    * @param {string} id
    * @returns {boolean}
    */
   isRegistered(id) {
-    return this._registry.has(id);
+    const resolved = this.resolveSceneId(id);
+    return this._registry.has(resolved);
   }
 
   /**
@@ -162,7 +181,8 @@ export class SceneManager {
    * @returns {import('../scenes/SceneBase.js').SceneBase}
    */
   loadScene(id) {
-    const scene = this._registry.get(id);
+    const resolved = this.resolveSceneId(id);
+    const scene = this._registry.get(resolved);
     if (!scene) {
       throw new Error(`Scene not registered: ${id}`);
     }
@@ -300,12 +320,14 @@ export class SceneManager {
       return this.currentScene;
     }
 
-    if (!this._registry.has(targetSceneId)) {
-      const loaded = this.loadOrGenerateScene(targetSceneId, {
+    const resolvedTarget = this.resolveSceneId(targetSceneId);
+
+    if (!this._registry.has(resolvedTarget)) {
+      const loaded = this.loadOrGenerateScene(resolvedTarget, {
         depth,
         targetSeed: options.targetSeed,
       });
-      if (!loaded && !isProceduralSceneId(targetSceneId)) {
+      if (!loaded && !isProceduralSceneId(resolvedTarget)) {
         throw new Error(`Scene not registered: ${targetSceneId}`);
       }
       if (!loaded) {
@@ -321,7 +343,7 @@ export class SceneManager {
       this.currentScene.setPlayer(null);
     }
 
-    await this.transitionTo(targetSceneId, {
+    await this.transitionTo(resolvedTarget, {
       transition: options.transition ?? 'warp',
       duration: options.duration ?? 0.85,
       force: true,
@@ -417,11 +439,12 @@ export class SceneManager {
    * @param {string} id
    */
   async start(id) {
-    if (!this._registry.has(id)) {
+    const resolved = this.resolveSceneId(id);
+    if (!this._registry.has(resolved)) {
       throw new Error(`Scene not registered: ${id}`);
     }
     this.unloadCurrentScene();
-    await this._activate(id);
+    await this._activate(resolved);
     this._applyCameraFromScene();
     return this.currentScene;
   }
@@ -438,7 +461,8 @@ export class SceneManager {
     if (this.currentSceneId === id && !options.force) {
       return this.currentScene;
     }
-    if (!this._registry.has(id)) {
+    const resolved = this.resolveSceneId(id);
+    if (!this._registry.has(resolved)) {
       throw new Error(`Scene not registered: ${id}`);
     }
 
@@ -454,7 +478,7 @@ export class SceneManager {
         swapped: false,
         resolve,
         reject,
-        targetId: id,
+        targetId: resolved,
         startCameraPos: this.camera.position.clone(),
         startCameraFov: this.camera.fov,
         startSceneScale:

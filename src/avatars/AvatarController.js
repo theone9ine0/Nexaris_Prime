@@ -104,6 +104,8 @@ export class AvatarController {
     this.combatPaused = false;
     /** Combat zone: Space triggers dash instead of jump. */
     this.combatMode = false;
+    /** Preview pod: idle animation only, no locomotion (PR44). */
+    this.inspectMode = false;
     /** @type {import('../combat/CombatController.js').CombatController | null} */
     this.combatController = null;
     /** @type {import('../combat/AuraController.js').AuraController | null} */
@@ -235,6 +237,14 @@ export class AvatarController {
     const dt = Math.min(deltaTime, 0.05);
     if (this.dialoguePaused || this.combatPaused) {
       this.auraController?.update(deltaTime);
+      return;
+    }
+
+    if (this.inspectMode) {
+      this.auraController?.update(deltaTime);
+      this._updateLocomotionAnimation();
+      this._updateVRMFollowCamera();
+      this._updateVRMLocomotionExpression();
       return;
     }
 

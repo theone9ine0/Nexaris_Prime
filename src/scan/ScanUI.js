@@ -17,6 +17,7 @@ export class ScanUI {
    * @param {HTMLElement | null} [container]
    * @param {{
    *   onPhotosChange?: (files: import('./types.js').PhotoSet) => void,
+   *   onUploadAll?: () => void,
    *   onGenerate?: () => void,
    *   onExport?: () => void,
    *   onEnterWorld?: () => void,
@@ -63,6 +64,12 @@ export class ScanUI {
     const actions = document.createElement('div');
     actions.className = 'scan-actions';
 
+    this.uploadBtn = document.createElement('button');
+    this.uploadBtn.type = 'button';
+    this.uploadBtn.className = 'scan-btn';
+    this.uploadBtn.textContent = 'Upload Photos';
+    this.uploadBtn.addEventListener('click', () => this.callbacks.onUploadAll?.());
+
     this.generateBtn = document.createElement('button');
     this.generateBtn.type = 'button';
     this.generateBtn.className = 'scan-btn scan-btn-primary';
@@ -84,7 +91,7 @@ export class ScanUI {
     this.worldBtn.disabled = true;
     this.worldBtn.addEventListener('click', () => this.callbacks.onEnterWorld?.());
 
-    actions.append(this.generateBtn, this.exportBtn, this.worldBtn);
+    actions.append(this.uploadBtn, this.generateBtn, this.exportBtn, this.worldBtn);
 
     this.root.append(title, subtitle, this.slotsEl, this.statusEl, this.progressEl, actions);
     this.container?.appendChild(this.root);
@@ -199,6 +206,18 @@ export class ScanUI {
 
   hide() {
     this.root.classList.add('hidden');
+  }
+
+  /** Open file picker for first empty required slot. */
+  triggerUploadDialog() {
+    for (const slot of REQUIRED_PHOTO_SLOTS) {
+      const input = this._inputs.get(slot);
+      if (input && !input.files?.[0]) {
+        input.click();
+        return;
+      }
+    }
+    this._inputs.get(REQUIRED_PHOTO_SLOTS[0])?.click();
   }
 
   dispose() {

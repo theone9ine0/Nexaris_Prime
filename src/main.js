@@ -10,7 +10,11 @@ import { ExampleScene } from './scenes/ExampleScene.js';
 import { CrystalCavernScene } from './scenes/crystalCavernScene.js';
 import { RetroConsoleScene } from './scenes/retroConsoleScene.js';
 import { CombatZoneScene } from './scenes/CombatZoneScene.js';
-import { ScanChamberScene } from './scan/ScanChamberScene.js';
+import {
+  ScanChamberScene,
+  SCAN_CHAMBER_ALIAS,
+  MAIN_WORLD_SCENE_ID,
+} from './scenes/ScanChamberScene.js';
 import { CombatHUD } from './combat/CombatHUD.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 import { modelManager } from './core/ModelManager.js';
@@ -134,8 +138,10 @@ combatZoneScene.setCombatHud(combatHud);
 sceneManager.registerScene('combat_zone', combatZoneScene);
 
 const scanChamberScene = new ScanChamberScene();
-scanChamberScene.mountScanUI(container);
+scanChamberScene.mountScanUI(container, uiOverlay);
 sceneManager.registerScene('scan_chamber', scanChamberScene);
+sceneManager.registerSceneAlias(SCAN_CHAMBER_ALIAS, 'scan_chamber');
+sceneManager.registerSceneAlias(MAIN_WORLD_SCENE_ID, 'example');
 
 const anchorManager = new AnchorManager({ sceneManager });
 
@@ -190,7 +196,7 @@ async function switchScene(id, options) {
     combatHud.hide();
   }
   if (isScan) {
-    scanChamberScene.mountScanUI(container);
+    scanChamberScene.mountScanUI(container, uiOverlay);
     scanChamberScene.scanUI?.show();
   } else {
     scanChamberScene.scanUI?.hide();

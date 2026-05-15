@@ -6,6 +6,7 @@ import { GeneratedScene } from './GeneratedScene.js';
 import { PortalManager } from '../portals/PortalManager.js';
 import { getPortalThemeForDimension } from '../portals/portalThemes.js';
 import { proceduralSceneIdFromSeed } from './proceduralSceneId.js';
+import { SCAN_CHAMBER_SCENE_ID } from '../scenes/ScanChamberScene.js';
 
 const WORLD_SIZE = 22;
 const TERRAIN_SEGMENTS = 24;
@@ -474,7 +475,35 @@ export class MultiverseGenerator {
       scene.portalManager = manager;
     }
 
+    const scanPortal = this._maybeSpawnScanChamberPortal(scene, rng, manager);
+    if (scanPortal) portals.push(scanPortal);
+
     return portals;
+  }
+
+  /**
+   * PR44 — rare procedural portal to the character-creation scan chamber.
+   * @param {GeneratedScene} scene
+   * @param {SeededRandom} rng
+   * @param {PortalManager} manager
+   */
+  _maybeSpawnScanChamberPortal(scene, rng, manager) {
+    if (rng.next() > 0.14) return null;
+
+    return manager.createPortal({
+      id: `${scene.id}_portal_scan`,
+      targetSceneId: SCAN_CHAMBER_SCENE_ID,
+      position: new THREE.Vector3(
+        rng.range(-6, 6),
+        rng.range(1, 2.2),
+        rng.range(-6, 6),
+      ),
+      color: 0xaaddff,
+      colorOuter: 0xffffff,
+      radius: rng.range(0.8, 1.05),
+      frameStyle: 'crystal',
+      label: 'SCAN CHAMBER',
+    });
   }
 
   /**

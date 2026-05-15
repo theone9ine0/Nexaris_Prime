@@ -28,7 +28,13 @@ export class UIOverlay {
     this.choicesEl.className = 'dialogue-choices hidden';
 
     this.panel.append(this.speakerEl, this.textEl, this.hintEl, this.choicesEl);
+    this.scanBanner = document.createElement('div');
+    this.scanBanner.className = 'scan-chamber-banner hidden';
+    this.scanBanner.innerHTML =
+      '<strong>Scan Chamber</strong> — Upload 360° photos · Generate stylized avatar · Exit via portal';
+
     this.root.appendChild(this.panel);
+    this.root.appendChild(this.scanBanner);
     this.container?.appendChild(this.root);
 
     this._fullText = '';
@@ -120,6 +126,14 @@ export class UIOverlay {
       this._onTypingComplete = null;
       cb?.();
     }
+  }
+
+  showScanChamberBanner() {
+    this.scanBanner?.classList.remove('hidden');
+  }
+
+  hideScanChamberBanner() {
+    this.scanBanner?.classList.add('hidden');
   }
 
   hideDialogue() {

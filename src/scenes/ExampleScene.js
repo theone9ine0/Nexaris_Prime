@@ -7,6 +7,7 @@ import { SAMPLE_ROBOT_GLB, SAMPLE_VRM_URL } from '../assets/modelUrls.js';
 import { scanSession } from '../scan/AvatarScanManager.js';
 import { AvatarScanManager } from '../scan/AvatarScanManager.js';
 import { PortalManager } from '../portals/PortalManager.js';
+import { SCAN_CHAMBER_SCENE_ID } from './ScanChamberScene.js';
 
 const EXPRESSION_CYCLE = ['happy', 'angry', 'sad', 'surprised'];
 let _expressionIndex = 0;
@@ -129,6 +130,16 @@ export class ExampleScene extends SceneBase {
       color: 0x00ff88,
       radius: 1,
       frameStyle: 'arch',
+    });
+    this.portalManager.createPortal({
+      id: 'portal_scan_chamber',
+      targetSceneId: SCAN_CHAMBER_SCENE_ID,
+      position: new THREE.Vector3(0, 1.2, 5),
+      color: 0x88ddff,
+      colorOuter: 0xffffff,
+      radius: 0.9,
+      frameStyle: 'crystal',
+      label: 'SCAN CHAMBER',
     });
 
     this.interactionSystem?.rebuildTargets();
