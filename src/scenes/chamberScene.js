@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ShardManager } from '../shards/ShardManager.js';
 import { ClusterManager } from '../clusters/ClusterManager.js';
+import { NEXARIS_EFFECTS_PRESET } from '../effects/index.js';
 
 /**
  * Primary chamber: background orb + PR1 test shards in front of the orb.
@@ -136,18 +137,7 @@ export function createChamberScene(_ctx) {
     _glow: glow,
 
     configureEffects(effects) {
-      // Scene-wide bloom + color grading
-      effects.setSceneEffects({
-        bloom: { strength: 0.5, radius: 0.6, threshold: 0.15 },
-        colorGrading: {
-          saturation: 1.12,
-          contrast: 1.06,
-          tint: 0x7799cc,
-          tintStrength: 0.16,
-          vignette: 0.3,
-        },
-        glow: { intensity: 1.1 },
-      });
+      effects.applyPreset(NEXARIS_EFFECTS_PRESET);
 
       // Per-object glow / selective bloom
       effects.applyObjectEffect('orb', orb, {

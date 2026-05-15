@@ -1,6 +1,10 @@
 /**
- * PR3 Effects Pipeline — Three.js postprocessing (bloom, glow, color grading).
+ * PR3 Effects Pipeline — bloom, color grading, postprocessing.
  */
-export { EffectsManager, BLOOM_LAYER } from './EffectsManager.js';
+export {
+  EffectsManager,
+  BLOOM_LAYER,
+  NEXARIS_EFFECTS_PRESET,
+} from './EffectsManager.js';
 export { ColorGradingShader } from './shaders/ColorGradingShader.js';
 export { BloomMixShader } from './shaders/BloomMixShader.js';

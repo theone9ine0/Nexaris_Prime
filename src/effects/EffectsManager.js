@@ -10,6 +10,19 @@ import { BloomMixShader } from './shaders/BloomMixShader.js';
 /** Layer mask for selective per-object bloom. */
 export const BLOOM_LAYER = 1;
 
+/** Default Nexaris visual style: soft glow, subtle blue tint. */
+export const NEXARIS_EFFECTS_PRESET = {
+  bloom: { strength: 0.38, radius: 0.52, threshold: 0.22 },
+  colorGrading: {
+    saturation: 1.08,
+    contrast: 1.04,
+    brightness: 0.0,
+    tint: 0x7a9ec8,
+    tintStrength: 0.14,
+    vignette: 0.26,
+  },
+};
+
 /**
  * @typedef {{
  *   glow?: boolean,
@@ -21,95 +34,66 @@ export const BLOOM_LAYER = 1;
  */
 
 /**
- * @typedef {{
- *   bloom?: { strength?: number, radius?: number, threshold?: number },
- *   colorGrading?: {
- *     saturation?: number,
- *     contrast?: number,
- *     brightness?: number,
- *     tint?: number | string,
- *     tintStrength?: number,
- *     vignette?: number,
- *   },
- *   glow?: { intensity?: number },
- * }} SceneEffectOptions
- */
-
-/**
- * PR3 post-processing pipeline.
- *
- * Scene-wide: UnrealBloomPass + ColorGradingShader (+ ACES tone mapping).
- * Per-object: selective bloom layers + emissive glow / pulseGlow.
- *
- * Pipeline (no selective objects): RenderPass → Bloom → Grade → Output
- * Pipeline (selective bloom):      bloom pass + mix pass → Grade → Output
+ * Modular PR3 post-processing: RenderPass → Bloom → Color grading → Output.
  */
 export class EffectsManager {
   /**
    * @param {THREE.WebGLRenderer} renderer
    * @param {THREE.Scene} scene
    * @param {THREE.Camera} camera
+   * @param {{ resolutionScale?: number }} [options]
    */
-  constructor(renderer, scene, camera) {
+  constructor(renderer, scene, camera, options = {}) {
     this.renderer = renderer;
     this.scene = scene;
     this.camera = camera;
+    this._resolutionScale = options.resolutionScale ?? 1;
 
-    const { width, height } = this._getSize();
+    this._bloomEnabled = true;
+    this._colorGradingEnabled = true;
+    this._bloom = { ...NEXARIS_EFFECTS_PRESET.bloom };
+    this._colorGrading = { ...NEXARIS_EFFECTS_PRESET.colorGrading };
+
     this._bloomLayer = new THREE.Layers();
     this._bloomLayer.set(BLOOM_LAYER);
-
     /** @type {Map<string, { object: THREE.Object3D, options: ObjectEffectOptions, meshes: THREE.Mesh[] }>} */
     this._objectEffects = new Map();
-
     this._darkMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
     /** @type {Record<string, THREE.Material | THREE.Material[]>} */
     this._savedMaterials = {};
 
-    this._sceneEffects = {
-      bloom: { strength: 0.42, radius: 0.55, threshold: 0.18 },
-      colorGrading: {
-        saturation: 1.12,
-        contrast: 1.06,
-        brightness: 0.0,
-        tint: 0x88aacc,
-        tintStrength: 0.14,
-        vignette: 0.28,
-      },
-      glow: { intensity: 1.0 },
-    };
+    const { width, height } = this._getSize();
+
+    this._renderPass = new RenderPass(scene, camera);
 
     this._bloomPass = new UnrealBloomPass(
       new THREE.Vector2(width, height),
-      this._sceneEffects.bloom.strength,
-      this._sceneEffects.bloom.radius,
-      this._sceneEffects.bloom.threshold,
+      this._bloom.strength,
+      this._bloom.radius,
+      this._bloom.threshold,
     );
 
     this._colorGradingPass = new ShaderPass(ColorGradingShader);
     this._outputPass = new OutputPass();
 
-    // Scene-wide pipeline: render → bloom → grade → output
-    this._simpleComposer = new EffectComposer(renderer);
-    this._simpleComposer.addPass(new RenderPass(scene, camera));
-    this._simpleComposer.addPass(this._bloomPass);
-    this._simpleComposer.addPass(this._colorGradingPass);
-    this._outputPassSimple = new OutputPass();
-    this._simpleComposer.addPass(this._outputPassSimple);
+    /** @type {EffectComposer} */
+    this.composer = new EffectComposer(renderer);
+    this.composer.addPass(this._renderPass);
+    this.composer.addPass(this._bloomPass);
+    this.composer.addPass(this._colorGradingPass);
+    this.composer.addPass(this._outputPass);
 
-    // Selective bloom pipeline (per-object layers)
+    // Selective bloom path (when per-object glow/bloom is registered)
     this._bloomComposer = new EffectComposer(renderer);
     this._bloomComposer.renderToScreen = false;
     this._bloomComposer.addPass(new RenderPass(scene, camera));
-    this._bloomComposer.addPass(
-      new UnrealBloomPass(
-        new THREE.Vector2(width, height),
-        this._sceneEffects.bloom.strength,
-        this._sceneEffects.bloom.radius,
-        this._sceneEffects.bloom.threshold,
-      ),
+    this._selectiveBloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, height),
+      this._bloom.strength,
+      this._bloom.radius,
+      this._bloom.threshold,
     );
-    this._selectiveBloomPass = this._bloomComposer.passes[1];
+    this._bloomComposer.addPass(this._selectiveBloomPass);
 
     this._mixPass = new ShaderPass(
       new THREE.ShaderMaterial({
@@ -120,17 +104,17 @@ export class EffectsManager {
       'baseTexture',
     );
     this._mixPass.needsSwap = true;
-    this._mixPass.uniforms.bloomStrength.value = this._getMixStrength();
 
     this._colorGradingPassSelective = new ShaderPass(ColorGradingShader);
-    this._finalComposer = new EffectComposer(renderer);
-    this._finalComposer.addPass(new RenderPass(scene, camera));
-    this._finalComposer.addPass(this._mixPass);
-    this._finalComposer.addPass(this._colorGradingPassSelective);
-    this._finalComposer.addPass(new OutputPass());
+    this._selectiveComposer = new EffectComposer(renderer);
+    this._selectiveComposer.addPass(new RenderPass(scene, camera));
+    this._selectiveComposer.addPass(this._mixPass);
+    this._selectiveComposer.addPass(this._colorGradingPassSelective);
+    this._selectiveComposer.addPass(new OutputPass());
 
-    this._applyColorGradingUniforms();
     this._configureRenderer();
+    this._applyColorGradingUniforms();
+    this._syncBloomPasses();
     this.setSize(width, height);
   }
 
@@ -143,59 +127,124 @@ export class EffectsManager {
   _getSize() {
     const size = new THREE.Vector2();
     this.renderer.getSize(size);
-    return { width: size.x || window.innerWidth, height: size.y || window.innerHeight };
+    return {
+      width: size.x || window.innerWidth,
+      height: size.y || window.innerHeight,
+    };
   }
 
-  _getMixStrength() {
-    return this._sceneEffects.bloom.strength * (this._sceneEffects.glow.intensity ?? 1);
+  _composerSize(width, height) {
+    return {
+      width: Math.max(1, Math.floor(width * this._resolutionScale)),
+      height: Math.max(1, Math.floor(height * this._resolutionScale)),
+    };
+  }
+
+  _syncBloomPasses() {
+    const strength = this._bloomEnabled ? this._bloom.strength : 0;
+    for (const pass of [this._bloomPass, this._selectiveBloomPass]) {
+      pass.strength = strength;
+      pass.radius = this._bloom.radius;
+      pass.threshold = this._bloom.threshold;
+    }
+    this._mixPass.uniforms.bloomStrength.value = strength;
   }
 
   _applyColorGradingUniforms() {
+    const enabled = this._colorGradingEnabled;
     for (const pass of [this._colorGradingPass, this._colorGradingPassSelective]) {
       const u = pass.uniforms;
-      const cg = this._sceneEffects.colorGrading;
-      u.saturation.value = cg.saturation;
-      u.contrast.value = cg.contrast;
+      const cg = this._colorGrading;
+      u.saturation.value = enabled ? cg.saturation : 1;
+      u.contrast.value = enabled ? cg.contrast : 1;
       u.brightness.value = cg.brightness;
       u.tint.value.set(cg.tint);
-      u.tintStrength.value = cg.tintStrength;
-      u.vignette.value = cg.vignette;
+      u.tintStrength.value = enabled ? cg.tintStrength : 0;
+      u.vignette.value = enabled ? cg.vignette : 0;
     }
   }
 
+  enableBloom() {
+    this._bloomEnabled = true;
+    this._syncBloomPasses();
+  }
+
+  disableBloom() {
+    this._bloomEnabled = false;
+    this._syncBloomPasses();
+  }
+
+  /** @returns {boolean} */
+  isBloomEnabled() {
+    return this._bloomEnabled;
+  }
+
   /**
-   * Scene-wide bloom, color grading, and glow intensity.
-   * @param {SceneEffectOptions} options
+   * @param {number} value
    */
-  setSceneEffects(options = {}) {
-    if (options.bloom) {
-      Object.assign(this._sceneEffects.bloom, options.bloom);
-      const { strength, radius, threshold } = this._sceneEffects.bloom;
-      for (const pass of [this._bloomPass, this._selectiveBloomPass]) {
-        pass.strength = strength;
-        pass.radius = radius;
-        pass.threshold = threshold;
-      }
-      this._mixPass.uniforms.bloomStrength.value = this._getMixStrength();
+  setBloomStrength(value) {
+    this._bloom.strength = value;
+    this._syncBloomPasses();
+  }
+
+  /**
+   * @param {number} value
+   */
+  setBloomRadius(value) {
+    this._bloom.radius = value;
+    this._syncBloomPasses();
+  }
+
+  /**
+   * @param {number} value
+   */
+  setBloomThreshold(value) {
+    this._bloom.threshold = value;
+    this._syncBloomPasses();
+  }
+
+  enableColorGrading() {
+    this._colorGradingEnabled = true;
+    this._applyColorGradingUniforms();
+  }
+
+  disableColorGrading() {
+    this._colorGradingEnabled = false;
+    this._applyColorGradingUniforms();
+  }
+
+  /**
+   * @param {Partial<typeof NEXARIS_EFFECTS_PRESET.colorGrading>} options
+   */
+  setColorGrading(options = {}) {
+    Object.assign(this._colorGrading, options);
+    this._applyColorGradingUniforms();
+  }
+
+  /**
+   * @param {number} scale 0.25–1, composer internal resolution scale
+   */
+  setResolutionScale(scale) {
+    this._resolutionScale = Math.max(0.25, Math.min(1, scale));
+    const { width, height } = this._getSize();
+    this.setSize(width, height);
+  }
+
+  /**
+   * @param {Partial<typeof NEXARIS_EFFECTS_PRESET>} preset
+   */
+  applyPreset(preset = NEXARIS_EFFECTS_PRESET) {
+    if (preset.bloom) {
+      Object.assign(this._bloom, preset.bloom);
+      this._syncBloomPasses();
     }
-    if (options.colorGrading) {
-      Object.assign(this._sceneEffects.colorGrading, options.colorGrading);
+    if (preset.colorGrading) {
+      Object.assign(this._colorGrading, preset.colorGrading);
       this._applyColorGradingUniforms();
     }
-    if (options.glow) {
-      Object.assign(this._sceneEffects.glow, options.glow);
-      this._mixPass.uniforms.bloomStrength.value = this._getMixStrength();
-    }
   }
 
   /**
-   * @param {string} id
-   * @param {THREE.Object3D} object
-   * @param {ObjectEffectOptions} options
-   */
-  /**
-   * Per-shard wrapper around {@link EffectsManager.applyObjectEffect}.
-   * @param {string} id
    * @param {import('../shards/Shard.js').Shard} shard
    * @param {ObjectEffectOptions} options
    */
@@ -217,14 +266,11 @@ export class EffectsManager {
     object.traverse((child) => {
       if (!child.isMesh) return;
       meshes.push(child);
-
       if (options.bloom || options.glow) {
         child.layers.enable(BLOOM_LAYER);
       }
-
       const mat = child.material;
       if (!mat) return;
-
       if (options.emissive !== undefined && 'emissive' in mat) {
         mat.emissive = new THREE.Color(options.emissive);
       }
@@ -237,31 +283,18 @@ export class EffectsManager {
     this._objectEffects.set(id, { object, options, meshes });
   }
 
-  /**
-   * @param {string} id
-   */
   removeObjectEffect(id) {
     const entry = this._objectEffects.get(id);
     if (!entry) return;
-
     entry.object.traverse((child) => {
-      if (child.isMesh) {
-        child.layers.disable(BLOOM_LAYER);
-      }
+      if (child.isMesh) child.layers.disable(BLOOM_LAYER);
     });
     delete entry.object.userData.effectsId;
     this._objectEffects.delete(id);
   }
 
-  /**
-   * @param {string} id
-   * @returns {ObjectEffectOptions | undefined}
-   */
-  getObjectEffect(id) {
-    return this._objectEffects.get(id)?.options;
-  }
-
   _hasSelectiveBloom() {
+    if (!this._bloomEnabled) return false;
     for (const { options } of this._objectEffects.values()) {
       if (options.bloom || options.glow) return true;
     }
@@ -284,23 +317,18 @@ export class EffectsManager {
     }
   }
 
-  /**
-   * @param {number} _delta
-   */
   update(_delta) {
     const t = performance.now() * 0.001;
     const pulse = (Math.sin(t * 2.2) + 1) * 0.5;
 
     for (const { options, meshes } of this._objectEffects.values()) {
       if (!options.pulseGlow && !options.glow) continue;
-
       const boost = options.pulseGlow ? 0.6 + pulse * 0.9 : 1.0;
       const base = options.emissiveIntensity ?? 1.2;
-
       for (const mesh of meshes) {
         const mat = mesh.material;
         if (mat && 'emissiveIntensity' in mat) {
-          mat.emissiveIntensity = base * boost * (this._sceneEffects.glow.intensity ?? 1);
+          mat.emissiveIntensity = base * boost;
         }
       }
     }
@@ -311,30 +339,32 @@ export class EffectsManager {
    * @param {number} height
    */
   setSize(width, height) {
-    this._simpleComposer.setSize(width, height);
-    this._finalComposer.setSize(width, height);
-    this._bloomComposer.setSize(width, height);
-    this._bloomPass.setSize(width, height);
-    this._selectiveBloomPass.setSize(width, height);
+    const { width: cw, height: ch } = this._composerSize(width, height);
+    this.composer.setSize(cw, ch);
+    this._selectiveComposer.setSize(cw, ch);
+    this._bloomComposer.setSize(cw, ch);
+    this._bloomPass.setSize(cw, ch);
+    this._selectiveBloomPass.setSize(cw, ch);
+    this.renderer.setSize(width, height);
   }
 
+  /** Render via EffectComposer (use instead of renderer.render). */
   render() {
     if (this._hasSelectiveBloom()) {
       this.scene.traverse(this._darkenNonBloomed.bind(this));
       this._bloomComposer.render();
       this.scene.traverse(this._restoreMaterial.bind(this));
-
       this._mixPass.uniforms.bloomTexture.value =
         this._bloomComposer.readBuffer.texture;
-      this._finalComposer.render();
+      this._selectiveComposer.render();
     } else {
-      this._simpleComposer.render();
+      this.composer.render();
     }
   }
 
   dispose() {
-    this._simpleComposer.dispose();
-    this._finalComposer.dispose();
+    this.composer.dispose();
+    this._selectiveComposer.dispose();
     this._bloomComposer.dispose();
     this._darkMaterial.dispose();
     this._mixPass.fullscreenMaterial.dispose();

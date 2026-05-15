@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { applyEasing } from '../animation/Easing.js';
-import { EffectsManager } from '../effects/EffectsManager.js';
+import { EffectsManager } from '../effects/index.js';
 import { AnimationSystem } from '../animation/index.js';
 import { disposeSceneGraph } from './disposeSceneGraph.js';
 
