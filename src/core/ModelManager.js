@@ -142,6 +142,15 @@ export class ModelManager {
   }
 
   /**
+   * Load a clone for avatar part swapping (skinned or static meshes).
+   * @param {string} url
+   * @returns {Promise<ClonedModel>}
+   */
+  async loadAvatarPart(url) {
+    return this.cloneModel(url);
+  }
+
+  /**
    * Clone a cached model for instancing in the scene.
    * Uses SkeletonUtils for skinned / animated assets.
    * @param {string} url

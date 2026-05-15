@@ -58,6 +58,7 @@ export class NPCManager {
       object,
       animations,
       mixerManager: this.mixerManager,
+      modelManager: this.modelManager,
       id: options.id ?? `npc_${this._idCounter++}`,
       ...options,
     });

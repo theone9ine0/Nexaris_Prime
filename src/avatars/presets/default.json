@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "colors": {
+    "body": "#4a88cc",
+    "outfit": "#2a4466"
+  },
+  "materials": {
+    "body": {
+      "emissive": "#2244aa",
+      "emissiveIntensity": 0.35,
+      "metalness": 0.65,
+      "roughness": 0.35
+    }
+  },
+  "parts": {},
+  "accessories": []
+}

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { AnimationStateMachine } from '../core/AnimationStateMachine.js';
+import { AvatarCustomizer } from './AvatarCustomizer.js';
 import { resolveAnimationClips, HUMANOID_CLIP_PATTERNS } from './clipResolver.js';
 
 const _UP = new THREE.Vector3(0, 1, 0);
@@ -8,6 +9,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
  * @typedef {import('../core/InputSystem.js').InputSystem} InputSystem
  * @typedef {import('../core/CameraController.js').CameraController} CameraController
  * @typedef {import('../core/AnimationMixerManager.js').AnimationMixerManager} AnimationMixerManager
+ * @typedef {import('../core/ModelManager.js').ModelManager} ModelManager
+ * @typedef {import('./AvatarCustomizer.js').AvatarCustomizer} AvatarCustomizer
+ * @typedef {import('./AvatarCustomizer.js').AvatarCustomizationConfig} AvatarCustomizationConfig
  */
 
 /**
@@ -17,6 +21,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
  *   inputSystem: InputSystem,
  *   cameraController: CameraController,
  *   mixerManager: AnimationMixerManager,
+ *   modelManager?: ModelManager,
+ *   customization?: AvatarCustomizationConfig,
+ *   customizer?: AvatarCustomizer,
  *   clipMap?: Record<string, string>,
  *   walkSpeed?: number,
  *   runSpeed?: number,
@@ -43,6 +50,7 @@ export class AvatarController {
       throw new Error('AvatarController requires mixerManager');
     }
     this.mixerManager = options.mixerManager;
+    this._modelManager = options.modelManager ?? null;
 
     this.walkSpeed = options.walkSpeed ?? 2.2;
     this.runSpeed = options.runSpeed ?? 4.5;
@@ -85,7 +93,43 @@ export class AvatarController {
     });
     this.stateMachine.setState('idle', 0);
 
+    /** @type {AvatarCustomizer | null} */
+    this.customizer =
+      options.customizer ??
+      (options.modelManager
+        ? new AvatarCustomizer({
+            baseObject: this.object,
+            modelManager: options.modelManager,
+            customization: options.customization,
+          })
+        : null);
+
     this._setupInteraction();
+  }
+
+  /**
+   * @returns {AvatarCustomizer | null}
+   */
+  getCustomizer() {
+    if (!this.customizer && this._modelManager) {
+      this.customizer = new AvatarCustomizer({
+        baseObject: this.object,
+        modelManager: this._modelManager,
+      });
+    }
+    return this.customizer;
+  }
+
+  /**
+   * @param {AvatarCustomizationConfig} config
+   */
+  async applyCustomization(config) {
+    const customizer = this.getCustomizer();
+    if (!customizer) {
+      console.warn('[AvatarController] applyCustomization requires modelManager');
+      return;
+    }
+    await customizer.applyCustomization(config);
   }
 
   _setupInteraction() {
@@ -259,6 +303,8 @@ export class AvatarController {
   }
 
   dispose() {
+    this.customizer?.dispose();
+    this.customizer = null;
     this.stateMachine?.dispose();
     this.mixerManager.removeMixer(this.object);
     if (this._interactive?.mesh) {

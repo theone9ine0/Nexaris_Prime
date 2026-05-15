@@ -3,7 +3,12 @@ import { SceneBase } from './SceneBase.js';
 import { modelManager } from '../core/ModelManager.js';
 import { AvatarController } from '../avatars/AvatarController.js';
 import { NPCManager } from '../npc/NPCManager.js';
-import { SAMPLE_ROBOT_GLB } from '../assets/modelUrls.js';
+import {
+  SAMPLE_DUCK_GLB,
+  SAMPLE_FOX_GLB,
+  SAMPLE_ROBOT_GLB,
+} from '../assets/modelUrls.js';
+import { NEXARIS_DEFAULT_PRESET } from '../avatars/presets/nexarisDefault.js';
 
 /**
  * Example dimension — playable avatar, wandering NPCs, shards, and props.
@@ -118,10 +123,13 @@ export class ExampleScene extends SceneBase {
         inputSystem: this.inputSystem,
         cameraController: this.cameraController,
         mixerManager: this._animationSystem.mixerManager,
+        modelManager,
         groundY: 0,
         walkSpeed: 2.4,
         runSpeed: 5,
       });
+
+      await this._applyExampleCustomization(avatar);
 
       this.setPlayer(avatar);
       this.cameraController.followTarget(avatar.object, {
@@ -135,6 +143,42 @@ export class ExampleScene extends SceneBase {
       console.warn('[ExampleScene] Avatar load failed:', err);
     } finally {
       this._avatarLoading = false;
+    }
+  }
+
+  /**
+   * Demo PR34 — part swaps, recolor, emissive, and bone-attached accessories.
+   * @param {import('../avatars/AvatarController.js').AvatarController} avatar
+   */
+  async _applyExampleCustomization(avatar) {
+    const customizer = avatar.getCustomizer();
+    if (!customizer) return;
+
+    try {
+      await customizer.applyCustomization(NEXARIS_DEFAULT_PRESET);
+
+      customizer.setColor('hair', 0x88ccff);
+      customizer.setMaterial('outfit', {
+        emissive: 0x113355,
+        emissiveIntensity: 0.25,
+        metalness: 0.5,
+        roughness: 0.45,
+      });
+
+      await customizer.setPart('hair', SAMPLE_FOX_GLB);
+      await customizer.setPart('outfit', SAMPLE_ROBOT_GLB);
+      await customizer.setPart('head', SAMPLE_DUCK_GLB);
+
+      await customizer.attachAccessory(SAMPLE_DUCK_GLB, 'RightHand', {
+        id: 'sword_prop',
+        scale: 0.1,
+        position: { x: 0.08, y: 0.05, z: 0 },
+        rotation: { x: 0.2, y: 0, z: -0.4 },
+      });
+
+      customizer.savePreset('example_player', customizer.exportConfig());
+    } catch (err) {
+      console.warn('[ExampleScene] Avatar customization demo failed:', err);
     }
   }
 
@@ -158,7 +202,7 @@ export class ExampleScene extends SceneBase {
     try {
       for (let i = 0; i < spawns.length; i++) {
         const s = spawns[i];
-        await this.npcManager.spawnNPC(
+        const npc = await this.npcManager.spawnNPC(
           SAMPLE_ROBOT_GLB,
           new THREE.Vector3(s.x, 0, s.z),
           {
@@ -172,6 +216,16 @@ export class ExampleScene extends SceneBase {
             },
           },
         );
+
+        const npcCustomizer = npc.getCustomizer?.();
+        if (npcCustomizer) {
+          const tint = [0xcc6644, 0x44aa88, 0xaa66cc][i];
+          npcCustomizer.setColor('body', tint);
+          npcCustomizer.setMaterial('body', {
+            emissive: tint,
+            emissiveIntensity: 0.15,
+          });
+        }
       }
 
       if (this.player) {

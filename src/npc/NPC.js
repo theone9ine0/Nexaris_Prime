@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { AnimationStateMachine } from '../core/AnimationStateMachine.js';
+import { AvatarCustomizer } from '../avatars/AvatarCustomizer.js';
 import {
   resolveAnimationClips,
   HUMANOID_CLIP_PATTERNS,
@@ -11,6 +12,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
 
 /**
  * @typedef {import('../core/AnimationMixerManager.js').AnimationMixerManager} AnimationMixerManager
+ * @typedef {import('../core/ModelManager.js').ModelManager} ModelManager
+ * @typedef {import('../avatars/AvatarCustomizer.js').AvatarCustomizer} AvatarCustomizer
+ * @typedef {import('../avatars/AvatarCustomizer.js').AvatarCustomizationConfig} AvatarCustomizationConfig
  */
 
 /**
@@ -18,6 +22,9 @@ const _UP = new THREE.Vector3(0, 1, 0);
  *   object: THREE.Object3D,
  *   animations?: THREE.AnimationClip[],
  *   mixerManager: AnimationMixerManager,
+ *   modelManager?: ModelManager,
+ *   customization?: AvatarCustomizationConfig,
+ *   customizer?: AvatarCustomizer,
  *   id?: string,
  *   clipMap?: Record<string, string>,
  *   walkSpeed?: number,
@@ -46,6 +53,7 @@ export class NPC {
 
     this.object = options.object;
     this.mixerManager = options.mixerManager;
+    this._modelManager = options.modelManager ?? null;
     this.id = options.id ?? options.object.name ?? `npc_${Date.now()}`;
     this.object.name = this.id;
 
@@ -96,7 +104,40 @@ export class NPC {
       this._pickWanderPoint();
     }
 
+    /** @type {AvatarCustomizer | null} */
+    this.customizer =
+      options.customizer ??
+      (options.modelManager
+        ? new AvatarCustomizer({
+            baseObject: this.object,
+            modelManager: options.modelManager,
+            customization: options.customization,
+          })
+        : null);
+
     this._setupInteraction();
+  }
+
+  /**
+   * @returns {AvatarCustomizer | null}
+   */
+  getCustomizer() {
+    if (!this.customizer && this._modelManager) {
+      this.customizer = new AvatarCustomizer({
+        baseObject: this.object,
+        modelManager: this._modelManager,
+      });
+    }
+    return this.customizer;
+  }
+
+  /**
+   * @param {AvatarCustomizationConfig} config
+   */
+  async applyCustomization(config) {
+    const customizer = this.getCustomizer();
+    if (!customizer) return;
+    await customizer.applyCustomization(config);
   }
 
   _setupInteraction() {
@@ -356,6 +397,8 @@ export class NPC {
   }
 
   dispose() {
+    this.customizer?.dispose();
+    this.customizer = null;
     this._interactFinishUnsub?.();
     this._interactFinishUnsub = null;
     this.stateMachine?.dispose();
