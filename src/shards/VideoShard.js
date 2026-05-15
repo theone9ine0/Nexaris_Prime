@@ -39,20 +39,9 @@ export class VideoShard extends Shard {
       throw new Error('VideoShard requires mode: "youtube" | "mp4"');
     }
 
-    /** @type {VideoShardMode} */
-    this.videoMode = mode;
-    this.autoplay = options.autoplay !== false;
-    this.loop = options.loop !== false;
-    this.mute = options.mute !== false;
-
-    this._cssScene = options.cssScene ?? null;
-    this._video = null;
-    this._videoTexture = null;
-    this._iframe = null;
-    this.cssObject = null;
-    this._youtubePlaying = this.autoplay;
-    this._mp4Playing = this.autoplay;
-
+    const autoplay = options.autoplay !== false;
+    const loop = options.loop !== false;
+    const mute = options.mute !== false;
     const width = options.width ?? 1.6;
     const height = options.height ?? 0.9;
 
@@ -66,9 +55,18 @@ export class VideoShard extends Shard {
         type: options.type ?? 'video',
         payload: { mode: 'mp4', src: options.src },
       });
+
+      this.videoMode = mode;
+      this.autoplay = autoplay;
+      this.loop = loop;
+      this.mute = mute;
+      this._cssScene = options.cssScene ?? null;
       this._video = prepared.video;
       this._videoTexture = prepared.texture;
-      this._mp4Playing = this.autoplay && !prepared.video.paused;
+      this._iframe = null;
+      this.cssObject = null;
+      this._youtubePlaying = false;
+      this._mp4Playing = autoplay && !prepared.video.paused;
     } else {
       super({
         ...options,
@@ -83,6 +81,19 @@ export class VideoShard extends Shard {
         width,
         height,
       });
+
+      this.videoMode = mode;
+      this.autoplay = autoplay;
+      this.loop = loop;
+      this.mute = mute;
+      this._cssScene = options.cssScene ?? null;
+      this._video = null;
+      this._videoTexture = null;
+      this._iframe = null;
+      this.cssObject = null;
+      this._youtubePlaying = autoplay;
+      this._mp4Playing = false;
+
       this._material.opacity = 0.08;
       this._material.transparent = true;
       this._setupYouTube(options, width, height);
