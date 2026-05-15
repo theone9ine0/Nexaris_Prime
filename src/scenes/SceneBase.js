@@ -23,6 +23,8 @@ export class SceneBase {
     this.modelManager = null;
     /** @type {import('../avatars/AvatarController.js').AvatarController | null} */
     this.player = null;
+    /** @type {import('../npc/NPCManager.js').NPCManager | null} */
+    this.npcManager = null;
     this._built = false;
     this._elapsed = 0;
   }
@@ -73,6 +75,7 @@ export class SceneBase {
   update(deltaTime) {
     this._elapsed += deltaTime;
     this.player?.update(deltaTime);
+    this.npcManager?.update(deltaTime);
   }
 
   /**
@@ -94,6 +97,8 @@ export class SceneBase {
 
   dispose() {
     this._disposePlayer();
+    this.npcManager?.dispose();
+    this.npcManager = null;
     this.shardManager?.clear();
     this.clusterManager?.clear();
     disposeSceneGraph(this.scene);

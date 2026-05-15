@@ -133,6 +133,15 @@ export class ModelManager {
   }
 
   /**
+   * Clone a model for NPC spawning (alias).
+   * @param {string} url
+   * @returns {Promise<ClonedModel>}
+   */
+  async loadNPC(url) {
+    return this.cloneModel(url);
+  }
+
+  /**
    * Clone a cached model for instancing in the scene.
    * Uses SkeletonUtils for skinned / animated assets.
    * @param {string} url

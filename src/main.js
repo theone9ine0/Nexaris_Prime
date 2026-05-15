@@ -67,6 +67,8 @@ const interactionSystem = new InteractionSystem({
   getScene: () => sceneManager.currentScene,
 });
 
+sceneManager.interactionSystem = interactionSystem;
+
 interactionSystem.onClick((target) => {
   const scene = sceneManager.currentScene;
   scene?.onInteractClick?.(target);
@@ -124,7 +126,7 @@ async function switchScene(id, options) {
   interactionSystem.rebuildTargets();
   syncCameraToScene();
   setTraversalInputActive(true);
-  if (sceneManager.currentScene?.player) {
+  if (sceneManager.currentSceneId === 'example') {
     webglRenderer.domElement.requestPointerLock?.();
   }
 }

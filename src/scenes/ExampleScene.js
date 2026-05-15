@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { SceneBase } from './SceneBase.js';
 import { modelManager } from '../core/ModelManager.js';
 import { AvatarController } from '../avatars/AvatarController.js';
+import { NPCManager } from '../npc/NPCManager.js';
 import { SAMPLE_ROBOT_GLB } from '../assets/modelUrls.js';
 
 /**
- * Example dimension — playable robot avatar, shards, and props.
+ * Example dimension — playable avatar, wandering NPCs, shards, and props.
  */
 export class ExampleScene extends SceneBase {
   constructor() {
@@ -13,13 +14,13 @@ export class ExampleScene extends SceneBase {
     this.cameraPosition.set(0, 0.2, 8);
     this.scene.background = new THREE.Color(0x050510);
 
-    /** @type {import('../core/InputSystem.js').InputSystem | null} */
     this.inputSystem = null;
-    /** @type {import('../core/CameraController.js').CameraController | null} */
     this.cameraController = null;
-    /** @type {import('../core/AnimationSystem.js').AnimationSystem | null} */
+    /** @type {import('../core/InteractionSystem.js').InteractionSystem | null} */
+    this.interactionSystem = null;
     this._animationSystem = null;
     this._avatarLoading = false;
+    this._npcsLoading = false;
   }
 
   _buildContent() {
@@ -69,9 +70,6 @@ export class ExampleScene extends SceneBase {
     });
   }
 
-  /**
-   * @param {string | null} previousSceneId
-   */
   onEnter(previousSceneId) {
     super.onEnter(previousSceneId);
     if (this.player) {
@@ -79,42 +77,33 @@ export class ExampleScene extends SceneBase {
     }
   }
 
-  /**
-   * @param {string | null} nextSceneId
-   */
   onExit(nextSceneId) {
     this.cameraController?.clearFollowTarget();
     super.onExit(nextSceneId);
   }
 
-  /**
-   * @param {import('../core/AnimationSystem.js').AnimationSystem | null} animationSystem
-   * @param {import('../effects/EffectsManager.js').EffectsManager | null} effectsManager
-   */
   bindSystems(animationSystem, effectsManager) {
     super.bindSystems(animationSystem, effectsManager);
     this._animationSystem = animationSystem;
-    if (this.player && animationSystem) {
-      this._attachAvatarToMixer(animationSystem);
-    } else if (!this.player && !this._avatarLoading) {
+
+    if (!this._animationSystem?.mixerManager) return;
+
+    if (!this.player && !this._avatarLoading) {
       this._spawnAvatar();
+    }
+
+    if (!this.npcManager && !this._npcsLoading) {
+      this._spawnNPCs();
     }
   }
 
   async _spawnAvatar() {
     if (this._avatarLoading || this.player) return;
-    if (!this.inputSystem || !this.cameraController) {
-      console.warn('[ExampleScene] inputSystem / cameraController required for avatar');
+    if (!this.inputSystem || !this.cameraController || !this._animationSystem?.mixerManager) {
       return;
     }
 
     this._avatarLoading = true;
-
-    if (!this._animationSystem?.mixerManager) {
-      console.warn('[ExampleScene] AnimationSystem not ready for avatar');
-      this._avatarLoading = false;
-      return;
-    }
 
     try {
       const { object, animations } = await modelManager.cloneModel(SAMPLE_ROBOT_GLB);
@@ -139,6 +128,9 @@ export class ExampleScene extends SceneBase {
         offset: new THREE.Vector3(0, 2.4, 5),
         lookAtOffset: new THREE.Vector3(0, 1.2, 0),
       });
+
+      this.npcManager?.setFollowTarget(avatar.object);
+      this.interactionSystem?.rebuildTargets();
     } catch (err) {
       console.warn('[ExampleScene] Avatar load failed:', err);
     } finally {
@@ -146,12 +138,65 @@ export class ExampleScene extends SceneBase {
     }
   }
 
-  /**
-   * @param {object} target
-   */
+  async _spawnNPCs() {
+    if (this._npcsLoading || this.npcManager) return;
+    if (!this._animationSystem?.mixerManager) return;
+
+    this._npcsLoading = true;
+    this.npcManager = new NPCManager(
+      this.scene,
+      this._animationSystem.mixerManager,
+      modelManager,
+    );
+
+    const spawns = [
+      { x: -4, z: 2, wanderRadius: 3.5 },
+      { x: 4, z: 1, wanderRadius: 4 },
+      { x: 0, z: -3, wanderRadius: 3 },
+    ];
+
+    try {
+      for (let i = 0; i < spawns.length; i++) {
+        const s = spawns[i];
+        await this.npcManager.spawnNPC(
+          SAMPLE_ROBOT_GLB,
+          new THREE.Vector3(s.x, 0, s.z),
+          {
+            id: `npc_guard_${i}`,
+            scale: 0.92,
+            initialState: 'wander',
+            wanderRadius: s.wanderRadius,
+            walkSpeed: 1.2,
+            onInteract: () => {
+              console.info(`[NPC] ${`npc_guard_${i}`} emote triggered`);
+            },
+          },
+        );
+      }
+
+      if (this.player) {
+        this.npcManager.setFollowTarget(this.player.object);
+      }
+
+      this.interactionSystem?.rebuildTargets();
+    } catch (err) {
+      console.warn('[ExampleScene] NPC spawn failed:', err);
+    } finally {
+      this._npcsLoading = false;
+    }
+  }
+
   onInteractClick(target) {
     if (target === this.player?._interactive || target?.id === this.player?.id) {
       this.player?.triggerEmote();
+      return;
+    }
+
+    const npc = this.npcManager
+      ?.getAllNPCs()
+      .find((n) => n.id === target?.id || n._interactive === target);
+    if (npc) {
+      npc.triggerInteract();
     }
   }
 

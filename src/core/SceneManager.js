@@ -17,6 +17,7 @@ import { modelManager } from './ModelManager.js';
  *   cssScene?: THREE.Scene,
  *   inputSystem?: import('./InputSystem.js').InputSystem,
  *   cameraController?: import('./CameraController.js').CameraController,
+ *   interactionSystem?: import('./InteractionSystem.js').InteractionSystem,
  * }} SceneManagerOptions
  */
 
@@ -40,6 +41,7 @@ export class SceneManager {
     this.cssScene = options.cssScene ?? new THREE.Scene();
     this.inputSystem = options.inputSystem ?? null;
     this.cameraController = options.cameraController ?? null;
+    this.interactionSystem = options.interactionSystem ?? null;
 
     /** @type {Map<string, import('../scenes/SceneBase.js').SceneBase>} */
     this._registry = new Map();
@@ -205,6 +207,7 @@ export class SceneManager {
       registered.modelManager = modelManager;
       registered.inputSystem = this.inputSystem;
       registered.cameraController = this.cameraController;
+      registered.interactionSystem = this.interactionSystem;
     }
     const scene = this.loadScene(id);
     scene.shardManager?.setCssScene(this.cssScene);
