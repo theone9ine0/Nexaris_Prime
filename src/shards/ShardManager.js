@@ -1,16 +1,31 @@
 import { Shard } from './Shard.js';
 
 /**
- * Creates, tracks, and animates all shards in a scene.
+ * Creates, tracks, and removes shards. Animation via {@link import('../core/AnimationSystem.js').AnimationSystem}.
  */
 export class ShardManager {
   /**
    * @param {THREE.Scene} scene
+   * @param {import('../core/AnimationSystem.js').AnimationSystem | null} [animationSystem]
    */
-  constructor(scene) {
+  constructor(scene, animationSystem = null) {
     this.scene = scene;
+    this.animationSystem = animationSystem;
     /** @type {Map<string, Shard>} */
     this.shards = new Map();
+  }
+
+  /**
+   * @param {import('../core/AnimationSystem.js').AnimationSystem | null} system
+   */
+  setAnimationSystem(system) {
+    for (const shard of this.shards.values()) {
+      this.animationSystem?.unregister(shard);
+    }
+    this.animationSystem = system;
+    for (const shard of this.shards.values()) {
+      this._registerShard(shard);
+    }
   }
 
   /**
@@ -27,7 +42,17 @@ export class ShardManager {
     const shard = new Shard(options);
     shard.addTo(this.scene);
     this.shards.set(options.id, shard);
+    this._registerShard(shard);
     return shard;
+  }
+
+  /**
+   * @param {Shard} shard
+   */
+  _registerShard(shard) {
+    if (this.animationSystem && shard.animation !== 'none') {
+      this.animationSystem.register(shard);
+    }
   }
 
   /**
@@ -37,35 +62,23 @@ export class ShardManager {
   removeShard(id) {
     const shard = this.shards.get(id);
     if (!shard) return false;
+    this.animationSystem?.unregister(shard);
     shard.removeFrom(this.scene);
     shard.dispose();
     this.shards.delete(id);
     return true;
   }
 
-  /**
-   * @param {string} id
-   * @returns {Shard | undefined}
-   */
   getShard(id) {
     return this.shards.get(id);
   }
 
-  /**
-   * @returns {Shard[]}
-   */
   getAllShards() {
     return [...this.shards.values()];
   }
 
-  /**
-   * @param {number} deltaTime
-   */
-  update(deltaTime) {
-    for (const shard of this.shards.values()) {
-      shard.update(deltaTime);
-    }
-  }
+  /** @deprecated AnimationSystem.update drives animation */
+  update(_deltaTime) {}
 
   clear() {
     for (const id of [...this.shards.keys()]) {

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { applyEasing } from '../animation/Easing.js';
 import { EffectsManager } from '../effects/index.js';
-import { AnimationSystem } from '../animation/index.js';
+import { AnimationSystem } from '../core/AnimationSystem.js';
 import { disposeSceneGraph } from './disposeSceneGraph.js';
 
 /**
@@ -168,14 +168,9 @@ export class SceneManager {
     );
     instance.configureEffects?.(this.effectsManager);
 
-    if (instance.shardManager) {
-      this.animationSystem = new AnimationSystem({
-        shardManager: instance.shardManager,
-        clusterManager: instance.clusterManager ?? null,
-      });
-    } else {
-      this.animationSystem = null;
-    }
+    this.animationSystem = new AnimationSystem();
+    instance.shardManager?.setAnimationSystem(this.animationSystem);
+    instance.clusterManager?.setAnimationSystem(this.animationSystem);
   }
 
   /**

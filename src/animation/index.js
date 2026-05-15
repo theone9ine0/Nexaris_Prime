@@ -1,6 +1,12 @@
-/**
- * PR4 Basic Animations — easing, curves, central update loop.
- */
-export { Easing, applyEasing } from './Easing.js';
+/** @deprecated Import from `../core/index.js` */
+export { AnimationSystem } from '../core/AnimationSystem.js';
+export {
+  floatAnimation,
+  pulseAnimation,
+  rotateAnimation,
+  driftAnimation,
+  glowPulseAnimation,
+  applyAnimations,
+} from '../core/animationHelpers.js';
 export { AnimationCurve } from './AnimationCurve.js';
-export { AnimationSystem } from './AnimationSystem.js';
+export { Easing, applyEasing } from './Easing.js';

@@ -1,4 +1,10 @@
 import * as THREE from 'three';
+import {
+  floatAnimation,
+  pulseAnimation,
+  glowPulseAnimation,
+  applyAnimations,
+} from '../core/animationHelpers.js';
 
 /**
  * @typedef {{
@@ -15,7 +21,8 @@ import * as THREE from 'three';
  */
 
 /**
- * Foundational Nexaris object: a textured or colored 3D plane with idle motion.
+ * Foundational Nexaris object: a textured or colored 3D plane.
+ * Animation is driven by {@link import('../core/AnimationSystem.js').AnimationSystem}.
  */
 export class Shard {
   /**
@@ -28,8 +35,6 @@ export class Shard {
 
     this.id = options.id;
     this.animation = options.animation ?? 'pulse';
-    this._phase = Math.random() * Math.PI * 2;
-    this._elapsed = 0;
 
     const width = options.width ?? 1;
     const height = options.height ?? 1;
@@ -68,6 +73,33 @@ export class Shard {
     this._basePosition = this.root.position.clone();
     this._baseRotation = this.root.rotation.clone();
     this._baseScale = this.root.scale.clone();
+
+    /** @type {import('../core/animationHelpers.js').AnimationState[]} */
+    this._animations = this._buildAnimations();
+  }
+
+  /**
+   * @returns {import('../core/animationHelpers.js').AnimationState[]}
+   */
+  _buildAnimations() {
+    if (this.animation === 'none') return [];
+
+    const list = [
+      floatAnimation(this.root, 0.06, 1.2),
+    ];
+
+    if (this.animation === 'pulse' || this.animation === 'both') {
+      list.push(pulseAnimation(this.root, 0.05, 2.5));
+    }
+
+    if (
+      (this.animation === 'glow' || this.animation === 'both') &&
+      'emissiveIntensity' in this._material
+    ) {
+      list.push(glowPulseAnimation(this._material, 0.5, 2.5));
+    }
+
+    return list;
   }
 
   /**
@@ -89,59 +121,35 @@ export class Shard {
     }
   }
 
-  /**
-   * @param {THREE.Scene | THREE.Group} parent
-   */
   addTo(parent) {
     parent.add(this.root);
   }
 
-  /**
-   * @param {THREE.Scene | THREE.Group} parent
-   */
   removeFrom(parent) {
     parent.remove(this.root);
   }
 
-  /**
-   * @param {{ x?: number, y?: number, z?: number }} position
-   */
   setPosition(position) {
     if (position.x !== undefined) this.root.position.x = position.x;
     if (position.y !== undefined) this.root.position.y = position.y;
     if (position.z !== undefined) this.root.position.z = position.z;
     this._basePosition.copy(this.root.position);
+    for (const anim of this._animations) {
+      if (anim.basePosition) anim.basePosition.copy(this.root.position);
+    }
   }
 
   /**
    * @param {number} deltaTime
    */
+  updateAnimation(deltaTime) {
+    if (this._animations.length === 0) return;
+    applyAnimations(this._animations, deltaTime);
+  }
+
+  /** @deprecated Use AnimationSystem */
   update(deltaTime) {
-    if (this.animation === 'none') return;
-
-    this._elapsed += deltaTime;
-    const t = this._elapsed + this._phase;
-
-    this.root.position.y = this._basePosition.y + Math.sin(t * 1.2) * 0.06;
-    this.root.rotation.z = this._baseRotation.z + Math.sin(t * 0.4) * 0.05;
-
-    const pulse = (Math.sin(t * 2.5) + 1) * 0.5;
-
-    if (this.animation === 'pulse' || this.animation === 'both') {
-      const s = 1 + pulse * 0.05;
-      this.root.scale.set(
-        this._baseScale.x * s,
-        this._baseScale.y * s,
-        this._baseScale.z,
-      );
-    }
-
-    if (
-      (this.animation === 'glow' || this.animation === 'both') &&
-      'emissiveIntensity' in this._material
-    ) {
-      this._material.emissiveIntensity = 0.35 + pulse * 0.5;
-    }
+    this.updateAnimation(deltaTime);
   }
 
   dispose() {

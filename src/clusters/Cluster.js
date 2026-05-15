@@ -1,6 +1,12 @@
 import * as THREE from 'three';
 import { Shard } from '../shards/Shard.js';
 import { LayoutEngine } from './LayoutEngine.js';
+import {
+  rotateAnimation,
+  pulseAnimation,
+  driftAnimation,
+  applyAnimations,
+} from '../core/animationHelpers.js';
 
 /**
  * @typedef {'circle' | 'spiral' | 'grid'} ClusterLayout
@@ -22,7 +28,7 @@ import { LayoutEngine } from './LayoutEngine.js';
  */
 
 /**
- * Groups shards with shared layout and group-level motion (rotate, pulse, drift).
+ * Groups shards with shared layout and group-level motion.
  */
 export class Cluster {
   /**
@@ -44,9 +50,6 @@ export class Cluster {
         : Array.isArray(animations)
           ? animations
           : [animations];
-
-    this._phase = Math.random() * Math.PI * 2;
-    this._elapsed = 0;
 
     this.root = new THREE.Group();
     this.root.name = `cluster:${this.id}`;
@@ -73,11 +76,29 @@ export class Cluster {
     if (this.shards.length > 0) {
       this.applyLayout(this.layout, this.layoutOptions);
     }
+
+    this._animations = this._buildAnimations();
   }
 
   /**
-   * @param {ClusterOptions} options
+   * @returns {import('../core/animationHelpers.js').AnimationState[]}
    */
+  _buildAnimations() {
+    const list = [];
+    if (this.animations.includes('rotate')) {
+      list.push(rotateAnimation(this.root, 'y', 0.22));
+    }
+    if (this.animations.includes('pulse')) {
+      list.push(pulseAnimation(this.root, 0.06, 1.8));
+    }
+    if (this.animations.includes('drift')) {
+      list.push(
+        driftAnimation(this.root, { x: 0.55, y: 0.85, z: 0.4 }, 1),
+      );
+    }
+    return list;
+  }
+
   _applyTransform(options) {
     const pos = options.position ?? {};
     this.root.position.set(pos.x ?? 0, pos.y ?? 0, pos.z ?? -3);
@@ -94,9 +115,6 @@ export class Cluster {
     }
   }
 
-  /**
-   * @param {import('../shards/Shard.js').Shard} shard
-   */
   addShard(shard) {
     if (this.shards.includes(shard)) return;
     this.shards.push(shard);
@@ -104,10 +122,6 @@ export class Cluster {
     this.applyLayout(this.layout, this.layoutOptions);
   }
 
-  /**
-   * @param {string} shardId
-   * @returns {boolean}
-   */
   removeShard(shardId) {
     const index = this.shards.findIndex((s) => s.id === shardId);
     if (index < 0) return false;
@@ -116,10 +130,6 @@ export class Cluster {
     return true;
   }
 
-  /**
-   * @param {ClusterLayout} [layout]
-   * @param {{ radius?: number, spacing?: number }} [options]
-   */
   applyLayout(layout = this.layout, options = {}) {
     this.layout = layout;
     this.layoutOptions = { ...this.layoutOptions, ...options };
@@ -137,67 +147,36 @@ export class Cluster {
     });
   }
 
-  /**
-   * @param {THREE.Scene | THREE.Group} parent
-   */
   addTo(parent) {
     parent.add(this.root);
   }
 
-  /**
-   * @param {THREE.Scene | THREE.Group} parent
-   */
   removeFrom(parent) {
     parent.remove(this.root);
   }
 
-  /**
-   * @param {{ x?: number, y?: number, z?: number }} position
-   */
   setPosition(position) {
     if (position.x !== undefined) this.root.position.x = position.x;
     if (position.y !== undefined) this.root.position.y = position.y;
     if (position.z !== undefined) this.root.position.z = position.z;
     this._basePosition.copy(this.root.position);
+    for (const anim of this._animations) {
+      if (anim.basePosition) anim.basePosition.copy(this.root.position);
+    }
   }
 
   /**
-   * Group + child shard animation.
+   * Group-level animation only (child shards updated via AnimationSystem).
    * @param {number} deltaTime
    */
+  updateAnimation(deltaTime) {
+    if (this._animations.length === 0) return;
+    applyAnimations(this._animations, deltaTime);
+  }
+
+  /** @deprecated Use AnimationSystem */
   update(deltaTime) {
-    if (this.animations.length > 0) {
-      this._elapsed += deltaTime;
-      const t = this._elapsed + this._phase;
-      const pulse = (Math.sin(t * 1.8) + 1) * 0.5;
-
-      if (this.animations.includes('rotate')) {
-        this.root.rotation.y = this._baseRotation.y + t * 0.22;
-      }
-
-      if (this.animations.includes('pulse')) {
-        const s = 1 + pulse * 0.06;
-        this.root.scale.set(
-          this._baseScale.x * s,
-          this._baseScale.y * s,
-          this._baseScale.z,
-        );
-      } else {
-        this.root.scale.copy(this._baseScale);
-      }
-
-      if (this.animations.includes('drift')) {
-        this.root.position.x = this._basePosition.x + Math.sin(t * 0.55) * 0.1;
-        this.root.position.y = this._basePosition.y + Math.sin(t * 0.85) * 0.08;
-        this.root.position.z = this._basePosition.z + Math.cos(t * 0.4) * 0.06;
-      } else {
-        this.root.position.copy(this._basePosition);
-      }
-    }
-
-    for (const shard of this.shards) {
-      shard.update(deltaTime);
-    }
+    this.updateAnimation(deltaTime);
   }
 
   dispose() {

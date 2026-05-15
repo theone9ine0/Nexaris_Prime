@@ -30,7 +30,7 @@ cssRenderer.domElement.style.inset = '0';
 cssRenderer.domElement.style.pointerEvents = 'none';
 container.appendChild(cssRenderer.domElement);
 
-// PR1 shards | PR2 clusters | PR3 effects | PR4 animation | PR26 scene (src/scene/)
+// PR1 shards | PR2 clusters | PR3 effects | PR4 core/animation | PR26 scene/
 const sceneManager = new SceneManager({
   renderer: webglRenderer,
   camera,
