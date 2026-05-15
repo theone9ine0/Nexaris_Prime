@@ -124,6 +124,15 @@ export class ModelManager {
   }
 
   /**
+   * Load and clone a model, returning object + animation clips for avatars / NPCs.
+   * @param {string} url
+   * @returns {Promise<ClonedModel>}
+   */
+  async loadCharacter(url) {
+    return this.cloneModel(url);
+  }
+
+  /**
    * Clone a cached model for instancing in the scene.
    * Uses SkeletonUtils for skinned / animated assets.
    * @param {string} url
@@ -141,6 +150,7 @@ export class ModelManager {
 
     const animations = entry.animations.map((clip) => clip.clone());
     object.userData.animations = animations;
+    object.userData.animationClips = animations;
     object.userData.modelUrl = url;
 
     return { object, animations };

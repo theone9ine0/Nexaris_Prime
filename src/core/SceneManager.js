@@ -15,6 +15,8 @@ import { modelManager } from './ModelManager.js';
  *   container: HTMLElement,
  *   cssRenderer?: import('three/examples/jsm/renderers/CSS3DRenderer.js').CSS3DRenderer,
  *   cssScene?: THREE.Scene,
+ *   inputSystem?: import('./InputSystem.js').InputSystem,
+ *   cameraController?: import('./CameraController.js').CameraController,
  * }} SceneManagerOptions
  */
 
@@ -36,6 +38,8 @@ export class SceneManager {
     this.container = options.container;
     this.cssRenderer = options.cssRenderer ?? null;
     this.cssScene = options.cssScene ?? new THREE.Scene();
+    this.inputSystem = options.inputSystem ?? null;
+    this.cameraController = options.cameraController ?? null;
 
     /** @type {Map<string, import('../scenes/SceneBase.js').SceneBase>} */
     this._registry = new Map();
@@ -199,14 +203,16 @@ export class SceneManager {
     if (registered) {
       registered.cssScene = this.cssScene;
       registered.modelManager = modelManager;
+      registered.inputSystem = this.inputSystem;
+      registered.cameraController = this.cameraController;
     }
     const scene = this.loadScene(id);
     scene.shardManager?.setCssScene(this.cssScene);
     const prevId = this.previousSceneId ?? this.currentSceneId;
-    scene.onEnter(prevId);
     this.currentScene = scene;
     this.currentSceneId = id;
     this.rebindSystems();
+    scene.onEnter(prevId);
     return scene;
   }
 

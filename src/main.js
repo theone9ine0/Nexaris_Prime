@@ -9,7 +9,7 @@ import { VoidScene } from './scenes/voidScene.js';
 import { ExampleScene } from './scenes/ExampleScene.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 import { modelManager } from './core/ModelManager.js';
-import { SAMPLE_FOX_GLB } from './assets/modelUrls.js';
+import { SAMPLE_ROBOT_GLB } from './assets/modelUrls.js';
 
 const container = document.getElementById('app');
 
@@ -41,14 +41,6 @@ container.appendChild(cssRenderer.domElement);
 
 const inputSystem = new InputSystem({ domElement: webglRenderer.domElement });
 
-const sceneManager = new SceneManager({
-  renderer: webglRenderer,
-  camera,
-  container,
-  cssRenderer,
-  cssScene,
-});
-
 const cameraController = new CameraController({
   camera,
   domElement: webglRenderer.domElement,
@@ -56,6 +48,16 @@ const cameraController = new CameraController({
   moveSpeed: 4,
   lookSpeed: 0.002,
   dampingFactor: 10,
+});
+
+const sceneManager = new SceneManager({
+  renderer: webglRenderer,
+  camera,
+  container,
+  cssRenderer,
+  cssScene,
+  inputSystem,
+  cameraController,
 });
 
 const interactionSystem = new InteractionSystem({
@@ -78,7 +80,7 @@ interactionSystem.onClick((target) => {
   );
 });
 
-modelManager.preload([SAMPLE_FOX_GLB]).catch(() => {});
+modelManager.preload([SAMPLE_ROBOT_GLB]).catch(() => {});
 
 sceneManager.registerScene('chamber', new ChamberScene());
 sceneManager.registerScene('void', new VoidScene());
@@ -91,8 +93,13 @@ const _lookTarget = new THREE.Vector3(0, 0, 0);
 function syncCameraToScene() {
   const scene = sceneManager.currentScene;
   if (!scene) return;
+  if (scene.player) {
+    cameraController.followTarget(scene.player.object);
+    return;
+  }
   const pos = scene.cameraPosition ?? scene.scene.userData?.cameraPosition;
   if (pos) {
+    cameraController.clearFollowTarget();
     cameraController.applyScenePose(pos, _lookTarget);
     cameraController.setOrbitTarget(_lookTarget);
   }
@@ -117,6 +124,9 @@ async function switchScene(id, options) {
   interactionSystem.rebuildTargets();
   syncCameraToScene();
   setTraversalInputActive(true);
+  if (sceneManager.currentScene?.player) {
+    webglRenderer.domElement.requestPointerLock?.();
+  }
 }
 
 async function boot() {
@@ -139,11 +149,8 @@ inputSystem.on('keyDown', ({ code }) => {
   if (code === 'Digit3') {
     switchScene('example', { transition: 'fade', duration: 0.7 });
   }
-  if (code === 'KeyO') {
+  if (code === 'KeyO' && !sceneManager.currentScene?.player) {
     cameraController.toggleMode();
-  }
-  if (sceneManager.currentSceneId === 'example') {
-    sceneManager.currentScene?.handleKeyDown?.(code);
   }
   if (code === 'KeyS') {
     anchorManager.save('default', { label: 'Chamber snapshot' });

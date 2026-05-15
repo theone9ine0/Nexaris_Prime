@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { InputSystem } from './InputSystem.js';
 
 /**
- * @typedef {'freefly' | 'orbit'} CameraMode
+ * @typedef {'freefly' | 'orbit' | 'follow'} CameraMode
  */
 
 /**
@@ -22,6 +22,7 @@ import { InputSystem } from './InputSystem.js';
 
 const MODE_FREEFLY = 'freefly';
 const MODE_ORBIT = 'orbit';
+const MODE_FOLLOW = 'follow';
 
 const PI_2 = Math.PI / 2;
 const EPS = 1e-6;
@@ -56,6 +57,15 @@ export class CameraController {
     this._inputActive = true;
 
     this.orbitTarget = new THREE.Vector3(0, 0, 0);
+
+    /** @type {THREE.Object3D | null} */
+    this.followTarget = null;
+    this.followOffset = new THREE.Vector3(0, 2.2, 4.5);
+    this.followLookAtOffset = new THREE.Vector3(0, 1.4, 0);
+    this.followSmooth = 10;
+    this._followYaw = 0;
+    this._followPitch = 0.25;
+    this.freeLook = true;
 
     this._velocity = new THREE.Vector3();
     this._moveInput = new THREE.Vector3();
@@ -92,7 +102,10 @@ export class CameraController {
       return;
     }
 
-    if (this.mode === MODE_FREEFLY && payload.button === 0) {
+    if (
+      (this.mode === MODE_FREEFLY || this.mode === MODE_FOLLOW) &&
+      payload.button === 0
+    ) {
       this.domElement.requestPointerLock?.();
     }
   }
@@ -118,8 +131,41 @@ export class CameraController {
   /**
    * @param {CameraMode} mode
    */
+  /**
+   * @param {THREE.Object3D} target
+   * @param {{ offset?: THREE.Vector3, lookAtOffset?: THREE.Vector3 }} [options]
+   */
+  followTarget(target, options = {}) {
+    this.followTarget = target;
+    if (options.offset) this.followOffset.copy(options.offset);
+    if (options.lookAtOffset) this.followLookAtOffset.copy(options.lookAtOffset);
+
+    const worldPos = this._scratchV3a;
+    target.getWorldPosition(worldPos);
+    this._followYaw = Math.atan2(
+      this.camera.position.x - worldPos.x,
+      this.camera.position.z - worldPos.z,
+    );
+
+    this.setMode(MODE_FOLLOW);
+  }
+
+  clearFollowTarget() {
+    this.followTarget = null;
+    if (this.mode === MODE_FOLLOW) {
+      this.setMode(MODE_FREEFLY);
+    }
+  }
+
+  /**
+   * @returns {number} horizontal camera yaw (radians)
+   */
+  getFollowYaw() {
+    return this._followYaw;
+  }
+
   setMode(mode) {
-    if (mode !== MODE_FREEFLY && mode !== MODE_ORBIT) {
+    if (mode !== MODE_FREEFLY && mode !== MODE_ORBIT && mode !== MODE_FOLLOW) {
       throw new Error(`Unknown camera mode: ${mode}`);
     }
     if (mode === this.mode && this._modeBlend >= 1) return;
@@ -190,11 +236,41 @@ export class CameraController {
 
     if (!this._inputActive) return;
 
-    if (this.mode === MODE_FREEFLY) {
+    if (this.mode === MODE_FOLLOW) {
+      this._updateFollow(dt);
+    } else if (this.mode === MODE_FREEFLY) {
       this._updateFreeFly(dt);
     } else {
       this._updateOrbit(dt);
     }
+  }
+
+  /**
+   * @param {number} dt
+   */
+  _updateFollow(dt) {
+    if (!this.followTarget) return;
+
+    if (this.freeLook && document.pointerLockElement === this.domElement) {
+      const { x: dx, y: dy } = this.inputSystem.getMouseDelta();
+      this._followYaw -= dx * this.lookSpeed * 1.5;
+      this._followPitch -= dy * this.lookSpeed;
+      this._followPitch = THREE.MathUtils.clamp(this._followPitch, -0.15, 1.1);
+    }
+
+    const targetPos = this._scratchV3a;
+    this.followTarget.getWorldPosition(targetPos);
+
+    const offset = this._scratchV3b
+      .copy(this.followOffset)
+      .applyAxisAngle(new THREE.Vector3(0, 1, 0), this._followYaw);
+
+    const desiredPos = targetPos.clone().add(offset);
+    const smooth = 1 - Math.exp(-this.followSmooth * dt);
+    this.camera.position.lerp(desiredPos, smooth);
+
+    const lookAt = targetPos.clone().add(this.followLookAtOffset);
+    this.camera.lookAt(lookAt);
   }
 
   /**
@@ -337,6 +413,8 @@ export class CameraController {
   _prepareModeState(mode) {
     if (mode === MODE_ORBIT) {
       this._syncOrbitFromCamera();
+    } else if (mode === MODE_FOLLOW) {
+      this._velocity.set(0, 0, 0);
     } else {
       this._euler.setFromQuaternion(this.camera.quaternion, 'YXZ');
       this._velocity.set(0, 0, 0);

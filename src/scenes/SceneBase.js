@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { ShardManager } from '../shards/ShardManager.js';
 import { ClusterManager } from '../clusters/ClusterManager.js';
 import { disposeSceneGraph } from '../core/disposeSceneGraph.js';
+import { modelManager } from '../core/ModelManager.js';
 
 /**
  * Base class for Nexaris dimensions. Each subclass owns a THREE.Scene and world systems.
@@ -20,8 +21,17 @@ export class SceneBase {
     this.cssScene = null;
     /** @type {import('../core/ModelManager.js').ModelManager | null} */
     this.modelManager = null;
+    /** @type {import('../avatars/AvatarController.js').AvatarController | null} */
+    this.player = null;
     this._built = false;
     this._elapsed = 0;
+  }
+
+  /**
+   * @param {import('../avatars/AvatarController.js').AvatarController | null} avatar
+   */
+  setPlayer(avatar) {
+    this.player = avatar;
   }
 
   /**
@@ -62,6 +72,7 @@ export class SceneBase {
    */
   update(deltaTime) {
     this._elapsed += deltaTime;
+    this.player?.update(deltaTime);
   }
 
   /**
@@ -82,11 +93,19 @@ export class SceneBase {
   }
 
   dispose() {
+    this._disposePlayer();
     this.shardManager?.clear();
     this.clusterManager?.clear();
     disposeSceneGraph(this.scene);
     this.shardManager = null;
     this.clusterManager = null;
     this._built = false;
+  }
+
+  _disposePlayer() {
+    if (!this.player) return;
+    this.player.dispose();
+    modelManager.disposeClone(this.player.object);
+    this.setPlayer(null);
   }
 }

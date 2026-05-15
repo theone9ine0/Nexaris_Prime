@@ -1,0 +1,268 @@
+import * as THREE from 'three';
+import { AnimationStateMachine } from '../core/AnimationStateMachine.js';
+import { resolveAnimationClips, HUMANOID_CLIP_PATTERNS } from './clipResolver.js';
+
+const _UP = new THREE.Vector3(0, 1, 0);
+
+/**
+ * @typedef {import('../core/InputSystem.js').InputSystem} InputSystem
+ * @typedef {import('../core/CameraController.js').CameraController} CameraController
+ * @typedef {import('../core/AnimationMixerManager.js').AnimationMixerManager} AnimationMixerManager
+ */
+
+/**
+ * @typedef {{
+ *   object: THREE.Object3D,
+ *   animations?: THREE.AnimationClip[],
+ *   inputSystem: InputSystem,
+ *   cameraController: CameraController,
+ *   mixerManager: AnimationMixerManager,
+ *   clipMap?: Record<string, string>,
+ *   walkSpeed?: number,
+ *   runSpeed?: number,
+ *   turnSpeed?: number,
+ *   acceleration?: number,
+ *   groundY?: number,
+ *   gravity?: number,
+ *   jumpForce?: number,
+ * }} AvatarControllerOptions
+ */
+
+/**
+ * PR32 — playable avatar with grounded movement and skeletal animation.
+ */
+export class AvatarController {
+  /**
+   * @param {AvatarControllerOptions} options
+   */
+  constructor(options) {
+    this.object = options.object;
+    this.inputSystem = options.inputSystem;
+    this.cameraController = options.cameraController;
+    if (!options.mixerManager) {
+      throw new Error('AvatarController requires mixerManager');
+    }
+    this.mixerManager = options.mixerManager;
+
+    this.walkSpeed = options.walkSpeed ?? 2.2;
+    this.runSpeed = options.runSpeed ?? 4.5;
+    this.turnSpeed = options.turnSpeed ?? 10;
+    this.acceleration = options.acceleration ?? 12;
+    this.groundY = options.groundY ?? 0;
+    this.gravity = options.gravity ?? 18;
+    this.jumpForce = options.jumpForce ?? 5.5;
+
+    this.id = options.object.name || 'avatar';
+    this.metadata = { title: 'Avatar', type: 'avatar', payload: null };
+
+    this._horizontalVelocity = new THREE.Vector3();
+    this._verticalVelocity = 0;
+    this._grounded = true;
+    this._isRunning = false;
+    this._locomotionState = 'idle';
+
+    this._forward = new THREE.Vector3();
+    this._right = new THREE.Vector3();
+    this._wishDir = new THREE.Vector3();
+
+    const animations = options.animations ?? [];
+    const clipNames = animations.map((c) => c.name);
+    const resolved =
+      options.clipMap ??
+      resolveAnimationClips(clipNames, HUMANOID_CLIP_PATTERNS);
+
+    this._clips = resolved;
+    this.mixerManager.createMixer(this.object, animations);
+
+    this.stateMachine = new AnimationStateMachine(this.mixerManager, this.object, {
+      defaultState: 'idle',
+      crossfadeDuration: 0.2,
+      states: {
+        idle: { clip: resolved.idle, loop: THREE.LoopRepeat },
+        walk: { clip: resolved.walk, loop: THREE.LoopRepeat },
+        run: { clip: resolved.run, loop: THREE.LoopRepeat, timeScale: 1.05 },
+      },
+    });
+    this.stateMachine.setState('idle', 0);
+
+    this._setupInteraction();
+  }
+
+  _setupInteraction() {
+    let hitMesh = null;
+    this.object.traverse((child) => {
+      if (child.isMesh && !hitMesh) hitMesh = child;
+    });
+    if (!hitMesh) return;
+
+    const self = this;
+    this._interactive = {
+      id: this.id,
+      mesh: hitMesh,
+      metadata: this.metadata,
+      onHoverEnter() {},
+      onHoverExit() {},
+      onClick() {
+        self.triggerEmote();
+      },
+    };
+    hitMesh.userData.interactive = this._interactive;
+  }
+
+  /**
+   * @param {number} x
+   * @param {number} y
+   * @param {number} z
+   */
+  setPosition(x, y, z) {
+    this.object.position.set(x, y, z);
+  }
+
+  /**
+   * @param {number} yaw
+   */
+  setRotation(yaw) {
+    this.object.rotation.y = yaw;
+  }
+
+  triggerEmote() {
+    const emote = this._clips.emote ?? this._clips.idle;
+    if (emote) {
+      this.stateMachine.triggerOneShot(emote, {
+        returnTo: this._locomotionState,
+        fadeIn: 0.12,
+      });
+    }
+  }
+
+  /**
+   * @param {number} deltaTime
+   */
+  update(deltaTime) {
+    const dt = Math.min(deltaTime, 0.05);
+    this._updateMovement(dt);
+    this._updateLocomotionAnimation();
+  }
+
+  /**
+   * @param {number} dt
+   */
+  _updateMovement(dt) {
+    const input = this.inputSystem;
+    const camera = this.cameraController.camera;
+
+    camera.getWorldDirection(this._forward);
+    this._forward.y = 0;
+    if (this._forward.lengthSq() < 1e-6) {
+      this._forward.set(0, 0, -1);
+    } else {
+      this._forward.normalize();
+    }
+
+    this._right.crossVectors(this._forward, _UP).normalize();
+
+    this._wishDir.set(0, 0, 0);
+    if (input.isKeyDown('KeyW')) this._wishDir.add(this._forward);
+    if (input.isKeyDown('KeyS')) this._wishDir.sub(this._forward);
+    if (input.isKeyDown('KeyD')) this._wishDir.add(this._right);
+    if (input.isKeyDown('KeyA')) this._wishDir.sub(this._right);
+
+    this._isRunning =
+      input.isKeyDown('ShiftLeft') || input.isKeyDown('ShiftRight');
+
+    const hasInput = this._wishDir.lengthSq() > 1e-4;
+    const maxSpeed = this._isRunning ? this.runSpeed : this.walkSpeed;
+
+    if (hasInput) {
+      this._wishDir.normalize().multiplyScalar(maxSpeed);
+    } else {
+      this._wishDir.set(0, 0, 0);
+    }
+
+    const damp = 1 - Math.exp(-this.acceleration * dt);
+    this._horizontalVelocity.lerp(this._wishDir, damp);
+
+    this.object.position.x += this._horizontalVelocity.x * dt;
+    this.object.position.z += this._horizontalVelocity.z * dt;
+
+    if (
+      input.isKeyDown('Space') &&
+      this._grounded &&
+      this._clips.jump &&
+      this._verticalVelocity <= 0.1
+    ) {
+      this._verticalVelocity = this.jumpForce;
+      this._grounded = false;
+      this.stateMachine.triggerOneShot(this._clips.jump, {
+        returnTo: 'idle',
+        fadeIn: 0.08,
+      });
+    }
+
+    this._verticalVelocity -= this.gravity * dt;
+    this.object.position.y += this._verticalVelocity * dt;
+
+    if (this.object.position.y <= this.groundY) {
+      this.object.position.y = this.groundY;
+      this._verticalVelocity = 0;
+      this._grounded = true;
+    }
+
+    if (hasInput && this._horizontalVelocity.lengthSq() > 0.05) {
+      const targetYaw = Math.atan2(this._horizontalVelocity.x, this._horizontalVelocity.z);
+      this.object.rotation.y = this._lerpAngle(
+        this.object.rotation.y,
+        targetYaw,
+        this.turnSpeed * dt,
+      );
+    } else if (this.cameraController.getFollowYaw) {
+      const camYaw = this.cameraController.getFollowYaw();
+      this.object.rotation.y = this._lerpAngle(
+        this.object.rotation.y,
+        camYaw,
+        this.turnSpeed * dt * 0.5,
+      );
+    }
+  }
+
+  _updateLocomotionAnimation() {
+    const speed = Math.hypot(
+      this._horizontalVelocity.x,
+      this._horizontalVelocity.z,
+    );
+    const runThreshold = this.walkSpeed * 0.85;
+    const walkThreshold = 0.12;
+
+    let next = 'idle';
+    if (speed > runThreshold && this._isRunning) {
+      next = 'run';
+    } else if (speed > walkThreshold) {
+      next = this._isRunning ? 'run' : 'walk';
+    }
+
+    if (next !== this._locomotionState) {
+      this.stateMachine.setLocomotion(next);
+      this._locomotionState = next;
+    }
+  }
+
+  /**
+   * @param {number} current
+   * @param {number} target
+   * @param {number} t
+   */
+  _lerpAngle(current, target, t) {
+    let delta = target - current;
+    while (delta > Math.PI) delta -= Math.PI * 2;
+    while (delta < -Math.PI) delta += Math.PI * 2;
+    return current + delta * Math.min(t, 1);
+  }
+
+  dispose() {
+    this.stateMachine?.dispose();
+    this.mixerManager.removeMixer(this.object);
+    if (this._interactive?.mesh) {
+      delete this._interactive.mesh.userData.interactive;
+    }
+  }
+}
