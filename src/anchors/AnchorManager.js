@@ -22,7 +22,7 @@ import {
 export class AnchorManager {
   /**
    * @param {{
-   *   sceneManager: import('../scene/SceneManager.js').SceneManager,
+   *   sceneManager: import('../core/SceneManager.js').SceneManager,
    *   persist?: boolean,
    *   storageKey?: string,
    * }} options

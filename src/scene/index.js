@@ -1,5 +1,5 @@
 /**
- * PR26 Scene Manager — register, load, transition, and cleanup scenes.
+ * PR26 Scene Manager — re-export from core.
  */
-export { SceneManager } from './SceneManager.js';
-export { disposeSceneGraph, disposeObject3D } from './disposeSceneGraph.js';
+export { SceneManager } from '../core/SceneManager.js';
+export { disposeSceneGraph, disposeObject3D } from '../core/disposeSceneGraph.js';

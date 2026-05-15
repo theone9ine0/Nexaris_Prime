@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { CSS3DRenderer } from 'three/examples/jsm/renderers/CSS3DRenderer.js';
-import { SceneManager } from './scene/index.js';
-import { createChamberScene } from './scenes/chamberScene.js';
-import { createVoidScene } from './scenes/voidScene.js';
+import { SceneManager } from './core/SceneManager.js';
+import { ChamberScene } from './scenes/chamberScene.js';
+import { VoidScene } from './scenes/voidScene.js';
+import { ExampleScene } from './scenes/ExampleScene.js';
 import { AnchorManager } from './anchors/AnchorManager.js';
 
 const container = document.getElementById('app');
@@ -30,7 +31,6 @@ cssRenderer.domElement.style.inset = '0';
 cssRenderer.domElement.style.pointerEvents = 'none';
 container.appendChild(cssRenderer.domElement);
 
-// PR1 shards | PR2 clusters | PR3 effects | PR4 core/animation | PR26 scene/
 const sceneManager = new SceneManager({
   renderer: webglRenderer,
   camera,
@@ -39,8 +39,9 @@ const sceneManager = new SceneManager({
   cssScene,
 });
 
-sceneManager.register('chamber', createChamberScene);
-sceneManager.register('void', createVoidScene);
+sceneManager.registerScene('chamber', new ChamberScene());
+sceneManager.registerScene('void', new VoidScene());
+sceneManager.registerScene('example', new ExampleScene());
 
 const anchorManager = new AnchorManager({ sceneManager });
 
@@ -50,13 +51,16 @@ async function boot() {
 
 boot();
 
-// Demo: 1/2 = scenes, S = save anchor, L = load anchor, P = print JSON
+// Demo: 1/2/3 = scenes, S = save anchor, L = load anchor, P = print JSON
 window.addEventListener('keydown', (e) => {
   if (e.key === '1') {
-    sceneManager.goTo('chamber', { transition: 'fade', duration: 0.8 });
+    sceneManager.transitionTo('chamber', { transition: 'fade', duration: 0.8 });
   }
   if (e.key === '2') {
-    sceneManager.goTo('void', { transition: 'warp', duration: 1.0 });
+    sceneManager.transitionTo('void', { transition: 'warp', duration: 1.0 });
+  }
+  if (e.key === '3') {
+    sceneManager.transitionTo('example', { transition: 'fade', duration: 0.7 });
   }
   if (e.key === 's' || e.key === 'S') {
     anchorManager.save('default', { label: 'Chamber snapshot' });
